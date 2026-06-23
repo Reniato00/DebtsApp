@@ -1,0 +1,490 @@
+@page "/debts"
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Mis Deudas</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Mis Deudas</h3>
+    <button class="btn btn-primary" @onclick="() => OpenCreate()">+ Nueva Deuda</button>
+</div>
+
+<div class="d-flex gap-2 mb-3">
+    <input @bind="SearchQuery" @bind:after="SearchAsync" class="form-control" style="max-width:300px" placeholder="Buscar deuda..." />
+    <div class="form-check form-switch d-flex align-items-center gap-2 ms-2">
+        <input class="form-check-input" type="checkbox" @bind="ShowOverdueOnly" @bind:after="LoadDebtListAsync" id="overdueFilter" />
+        <label class="form-check-label" for="overdueFilter">Solo vencidas</label>
+    </div>
+</div>
+
+@if (Loading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (ErrorMsg != null)
+{
+    <div class="alert alert-danger">@ErrorMsg</div>
+}
+else if (DebtList.Count == 0)
+{
+    <div class="text-center py-5 text-muted">
+        <p style="font-size:1.2rem">No hay deudas registradas</p>
+        <button class="btn btn-outline-primary" @onclick="() => OpenCreate()">Crear primera deuda</button>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Saldo actual</th>
+                    <th>Monto original</th>
+                    <th>Tasa %</th>
+                    <th>Pago mensual</th>
+                    <th>Vencimiento</th>
+                    <th style="width:200px">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in DebtList)
+                {
+                    <tr class="@(IsOverdue(d) ? "table-danger" : "")">
+                        <td><strong>@d.Name</strong></td>
+                        <td class="negative">@FormatMoney(d.CurrentBalance)</td>
+                        <td>@FormatMoney(d.OriginalAmount)</td>
+                        <td>@d.InterestRate.ToString("N1")%</td>
+                        <td>@FormatMoney(d.MonthlyPayment)</td>
+                        <td>
+                            @d.DueDate.ToShortDateString()
+                            @if (IsOverdue(d))
+                            {
+                                <span class="badge bg-danger ms-1">Vencida</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" title="Editar" @onclick="() => OpenEdit(d)">✏️</button>
+                                <button class="btn btn-outline-success" title="Pagar" @onclick="() => OpenPay(d)">💰</button>
+                                <button class="btn btn-outline-danger" title="Eliminar" @onclick="() => OpenDelete(d)">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <nav>
+        <ul class="pagination pagination-sm justify-content-center">
+            <li class="page-item @(Page <= 1 ? "disabled" : "")">
+                <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(Page - 1)">Anterior</a>
+            </li>
+            @for (int i = 1; i <= TotalPages; i++)
+            {
+                <li class="page-item @(i == Page ? "active" : "")">
+                    <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(i)">@i</a>
+                </li>
+            }
+            <li class="page-item @(Page >= TotalPages ? "disabled" : "")">
+                <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(Page + 1)">Siguiente</a>
+            </li>
+        </ul>
+    </nav>
+}
+
+@* ───── Modal: Crear / Editar Deuda ───── *@
+@if (ShowFormModal)
+{
+    <div class="modal-overlay" @onclick:stopPropagation @onclick="CloseForm">
+        <div class="modal-card" @onclick:stopPropagation>
+            <h5 class="mb-3">@(EditingDebt == null ? "Nueva Deuda" : "Editar Deuda")</h5>
+
+            <div class="mb-2">
+                <label class="form-label">Nombre</label>
+                <input @bind="FormName" class="form-control" />
+            </div>
+            <div class="row">
+                <div class="col mb-2">
+                    <label class="form-label">Monto original</label>
+                    <input type="number" step="0.01" @bind="FormOriginalAmount" class="form-control" />
+                </div>
+                <div class="col mb-2">
+                    <label class="form-label">Saldo actual</label>
+                    <input type="number" step="0.01" @bind="FormCurrentBalance" class="form-control" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col mb-2">
+                    <label class="form-label">Tasa de interés %</label>
+                    <input type="number" step="0.01" @bind="FormInterestRate" class="form-control" />
+                </div>
+                <div class="col mb-2">
+                    <label class="form-label">Pago mensual</label>
+                    <input type="number" step="0.01" @bind="FormMonthlyPayment" class="form-control" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col mb-3">
+                    <label class="form-label">Fecha de inicio</label>
+                    <input type="date" @bind="FormStartDate" class="form-control" />
+                </div>
+                <div class="col mb-3">
+                    <label class="form-label">Fecha de vencimiento</label>
+                    <input type="date" @bind="FormDueDate" class="form-control" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(FormError))
+            {
+                <div class="alert alert-danger py-2 small">@FormError</div>
+            }
+
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="CloseForm">Cancelar</button>
+                <button class="btn btn-primary" @onclick="SaveDebtAsync" disabled="@FormLoading">
+                    @if (FormLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ───── Modal: Confirmar Eliminación ───── *@
+@if (ShowDeleteModal && DeletingDebt != null)
+{
+    <div class="modal-overlay" @onclick="CloseDelete">
+        <div class="modal-card" @onclick:stopPropagation style="max-width:400px">
+            <h5 class="mb-3">Eliminar Deuda</h5>
+            <p>¿Estás seguro de eliminar <strong>@DeletingDebt.Name</strong>?</p>
+            <p class="text-muted small">Se eliminarán también todos los pagos asociados.</p>
+
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="CloseDelete">Cancelar</button>
+                <button class="btn btn-danger" @onclick="ConfirmDeleteAsync" disabled="@FormLoading">
+                    @if (FormLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ───── Modal: Pagar Deuda ───── *@
+@if (ShowPayModal && PayingDebt != null)
+{
+    <div class="modal-overlay" @onclick="ClosePay">
+        <div class="modal-card" @onclick:stopPropagation style="max-width:420px">
+            <h5 class="mb-3">Pagar Deuda</h5>
+            <p><strong>@PayingDebt.Name</strong> — Saldo: @FormatMoney(PayingDebt.CurrentBalance)</p>
+
+            <div class="mb-3">
+                <label class="form-label">Monto a pagar</label>
+                <input type="number" step="0.01" @bind="PayAmount" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Fecha del pago</label>
+                <input type="date" @bind="PayDate" class="form-control" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(FormError))
+            {
+                <div class="alert alert-danger py-2 small">@FormError</div>
+            }
+
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="ClosePay">Cancelar</button>
+                <button class="btn btn-success" @onclick="ConfirmPayAsync" disabled="@FormLoading">
+                    @if (FormLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Pagar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<DebtDto> DebtList = new();
+    private int Page = 1;
+    private int TotalPages = 1;
+    private const int PageSize = 10;
+    private bool Loading = true;
+    private string? ErrorMsg;
+    private string SearchQuery = "";
+    private bool ShowOverdueOnly;
+
+    // Form state
+    private bool ShowFormModal;
+    private bool ShowDeleteModal;
+    private bool ShowPayModal;
+    private bool FormLoading;
+    private string? FormError;
+    private DebtDto? EditingDebt;
+    private DebtDto? DeletingDebt;
+    private DebtDto? PayingDebt;
+
+    // Form fields
+    private string FormName = "";
+    private decimal FormOriginalAmount;
+    private decimal FormCurrentBalance;
+    private decimal FormInterestRate;
+    private decimal FormMonthlyPayment;
+    private DateTime FormStartDate = DateTime.Today;
+    private DateTime FormDueDate = DateTime.Today.AddYears(1);
+
+    // Pay fields
+    private decimal PayAmount;
+    private DateTime PayDate = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadDebtListAsync();
+    }
+
+    private async Task LoadDebtListAsync()
+    {
+        Loading = true;
+        ErrorMsg = null;
+        try
+        {
+            if (ShowOverdueOnly)
+            {
+                DebtList = await Api.GetAsync<List<DebtDto>>("api/debts/overdue") ?? new();
+                TotalPages = 1;
+                Page = 1;
+            }
+            else if (!string.IsNullOrWhiteSpace(SearchQuery))
+            {
+                var encoded = Uri.EscapeDataString(SearchQuery);
+                DebtList = await Api.GetAsync<List<DebtDto>>($"api/debts/search?query={encoded}") ?? new();
+                TotalPages = 1;
+                Page = 1;
+            }
+            else
+            {
+                var result = await Api.GetAsync<PagedResult<DebtDto>>($"api/debts?page={Page}&pageSize={PageSize}");
+                if (result != null)
+                {
+                    DebtList = result.Items;
+                    TotalPages = Math.Max(1, result.TotalPages);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = ex.Message;
+            DebtList = new();
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        Page = 1;
+        await LoadDebtListAsync();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        Page = page;
+        await LoadDebtListAsync();
+    }
+
+    private void OpenCreate()
+    {
+        EditingDebt = null;
+        FormName = "";
+        FormOriginalAmount = 0;
+        FormCurrentBalance = 0;
+        FormInterestRate = 0;
+        FormMonthlyPayment = 0;
+        FormStartDate = DateTime.Today;
+        FormDueDate = DateTime.Today.AddYears(1);
+        FormError = null;
+        ShowFormModal = true;
+    }
+
+    private void OpenEdit(DebtDto debt)
+    {
+        EditingDebt = debt;
+        FormName = debt.Name;
+        FormOriginalAmount = debt.OriginalAmount;
+        FormCurrentBalance = debt.CurrentBalance;
+        FormInterestRate = debt.InterestRate;
+        FormMonthlyPayment = debt.MonthlyPayment;
+        FormStartDate = debt.StartDate;
+        FormDueDate = debt.DueDate;
+        FormError = null;
+        ShowFormModal = true;
+    }
+
+    private void CloseForm()
+    {
+        ShowFormModal = false;
+        EditingDebt = null;
+    }
+
+    private async Task SaveDebtAsync()
+    {
+        FormError = null;
+        if (string.IsNullOrWhiteSpace(FormName))
+        {
+            FormError = "El nombre es requerido";
+            return;
+        }
+
+        FormLoading = true;
+        try
+        {
+            if (EditingDebt != null)
+            {
+                await Api.PutAsync<DebtDto>($"api/debts/{EditingDebt.Id}", new UpdateDebtRequest
+                {
+                    Name = FormName,
+                    OriginalAmount = FormOriginalAmount,
+                    CurrentBalance = FormCurrentBalance,
+                    InterestRate = FormInterestRate,
+                    MonthlyPayment = FormMonthlyPayment,
+                    StartDate = FormStartDate,
+                    DueDate = FormDueDate
+                });
+            }
+            else
+            {
+                await Api.PostAsync<DebtDto>("api/debts", new CreateDebtRequest
+                {
+                    Name = FormName,
+                    OriginalAmount = FormOriginalAmount,
+                    CurrentBalance = FormCurrentBalance,
+                    InterestRate = FormInterestRate,
+                    MonthlyPayment = FormMonthlyPayment,
+                    StartDate = FormStartDate,
+                    DueDate = FormDueDate
+                });
+            }
+
+            CloseForm();
+            await LoadDebtListAsync();
+        }
+        catch (Exception ex)
+        {
+            FormError = ex.Message;
+        }
+        finally
+        {
+            FormLoading = false;
+        }
+    }
+
+    private void OpenDelete(DebtDto debt)
+    {
+        DeletingDebt = debt;
+        ShowDeleteModal = true;
+    }
+
+    private void CloseDelete()
+    {
+        ShowDeleteModal = false;
+        DeletingDebt = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (DeletingDebt == null) return;
+        FormLoading = true;
+        try
+        {
+            await Api.DeleteAsync($"api/debts/{DeletingDebt.Id}");
+            CloseDelete();
+            await LoadDebtListAsync();
+        }
+        catch (Exception ex)
+        {
+            FormError = ex.Message;
+        }
+        finally
+        {
+            FormLoading = false;
+        }
+    }
+
+    private void OpenPay(DebtDto debt)
+    {
+        PayingDebt = debt;
+        PayAmount = debt.MonthlyPayment;
+        PayDate = DateTime.Today;
+        FormError = null;
+        ShowPayModal = true;
+    }
+
+    private void ClosePay()
+    {
+        ShowPayModal = false;
+        PayingDebt = null;
+    }
+
+    private async Task ConfirmPayAsync()
+    {
+        if (PayingDebt == null) return;
+        FormError = null;
+        if (PayAmount <= 0)
+        {
+            FormError = "El monto debe ser mayor a cero";
+            return;
+        }
+
+        FormLoading = true;
+        try
+        {
+            var createPayment = new CreatePaymentRequest
+            {
+                DebtId = PayingDebt.Id,
+                Amount = PayAmount,
+                PaymentDate = PayDate
+            };
+            await Api.PostAsync<PaymentDto>("api/payments", createPayment);
+            ClosePay();
+            await LoadDebtListAsync();
+        }
+        catch (Exception ex)
+        {
+            FormError = ex.Message;
+        }
+        finally
+        {
+            FormLoading = false;
+        }
+    }
+
+    private static bool IsOverdue(DebtDto d) => d.DueDate < DateTime.Today && d.CurrentBalance > 0;
+
+    private static string FormatMoney(decimal val) =>
+        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
+}

@@ -1,0 +1,222 @@
+@page "/calculator"
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Calculadora</PageTitle>
+
+<h3 class="mb-4">Calculadora</h3>
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link @(ActiveTab == "strategy" ? "active" : "")" href="javascript:void(0)" @onclick="ShowStrategy">Estrategia de pago</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(ActiveTab == "daily" ? "active" : "")" href="javascript:void(0)" @onclick="ShowDaily">Interés diario</a>
+    </li>
+</ul>
+
+@if (ActiveTab == "strategy")
+{
+    @* ───── Estrategia Snowball / Avalanche ───── *@
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Estrategia de pago</h5>
+        <p class="text-muted small">Snowball: paga primero la deuda más pequeña. Avalanche: paga primero la de mayor interés.</p>
+
+        <div class="d-flex gap-2 align-items-end mb-3">
+            <div style="max-width:250px">
+                <label class="form-label">Pago mensual disponible</label>
+                <input type="number" step="0.01" @bind="MonthlyPayment" class="form-control" />
+            </div>
+            <button class="btn btn-primary" @onclick="LoadStrategyAsync" disabled="@StrategyLoading">Calcular</button>
+        </div>
+
+        @if (StrategyLoading)
+        {
+            <div class="d-flex justify-content-center py-3">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            </div>
+        }
+        else if (StrategyResult != null)
+        {
+            <ul class="nav nav-pills mb-3 gap-2">
+                <li class="nav-item">
+                    <a class="nav-link @(ShowAvalanche ? "" : "active")" href="javascript:void(0)" @onclick="() => ShowAvalanche = false">
+                        Snowball (@StrategyResult.SnowballMonths meses)
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ShowAvalanche ? "active" : "")" href="javascript:void(0)" @onclick="() => ShowAvalanche = true">
+                        Avalanche (@StrategyResult.AvalancheMonths meses)
+                    </a>
+                </li>
+            </ul>
+
+            var steps = Steps;
+            var totalMonths = TotalMonths;
+
+            @if (steps.Count == 0)
+            {
+                <p class="text-muted">No hay deudas activas para calcular.</p>
+            }
+            else
+            {
+                <div class="table-responsive" style="max-height:400px; overflow-y:auto">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mes</th>
+                                <th>Deuda</th>
+                                <th>Pago</th>
+                                <th>Saldo restante</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in steps)
+                            {
+                                <tr>
+                                    <td>@s.Month</td>
+                                    <td>@s.DebtName</td>
+                                    <td>@FormatMoney(s.PaymentAmount)</td>
+                                    <td>@FormatMoney(s.RemainingBalance)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mt-2">Total: <strong>@totalMonths meses</strong> (@(totalMonths / 12) años @(totalMonths % 12) meses)</p>
+            }
+        }
+    </div>
+}
+else
+{
+    @* ───── Interés Diario ───── *@
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Interés diario por deuda</h5>
+        <p class="text-muted small">Monto que se acumula cada día en intereses.</p>
+
+        @if (DailyLoading)
+        {
+            <div class="d-flex justify-content-center py-3">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            </div>
+        }
+        else if (DailyResult != null)
+        {
+            @if (DailyResult.Items.Count == 0)
+            {
+                <p class="text-muted">No hay deudas activas.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Deuda</th>
+                                <th>Saldo actual</th>
+                                <th>Tasa %</th>
+                                <th>Interés diario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in DailyResult.Items)
+                            {
+                                <tr>
+                                    <td>@item.DebtName</td>
+                                    <td>@FormatMoney(item.CurrentBalance)</td>
+                                    <td>@item.InterestRate.ToString("N1")%</td>
+                                    <td class="negative">@FormatMoney(item.DailyInterest)</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td colspan="3">Total interés diario</td>
+                                <td class="negative">@FormatMoney(DailyResult.TotalDailyInterest)</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="text-muted small">
+                    Interés mensual estimado: <strong>@FormatMoney(DailyResult.TotalDailyInterest * 30)</strong>
+                    &nbsp;|&nbsp; Anual: <strong>@FormatMoney(DailyResult.TotalDailyInterest * 365)</strong>
+                </p>
+            }
+        }
+    </div>
+}
+
+@code {
+    private string ActiveTab = "strategy";
+
+    // Strategy
+    private decimal MonthlyPayment = 1000;
+    private bool StrategyLoading;
+    private PayoffStrategyResultDto? StrategyResult;
+    private bool ShowAvalanche;
+
+    private List<PayoffStepDto> Steps =>
+        ShowAvalanche ? (StrategyResult?.Avalanche ?? new()) : (StrategyResult?.Snowball ?? new());
+
+    private int TotalMonths =>
+        ShowAvalanche ? (StrategyResult?.AvalancheMonths ?? 0) : (StrategyResult?.SnowballMonths ?? 0);
+
+    // Daily
+    private bool DailyLoading;
+    private DailyInterestResultDto? DailyResult;
+
+    private void ShowStrategy() => ActiveTab = "strategy";
+    private void ShowDaily() => ActiveTab = "daily";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadDailyAsync();
+    }
+
+    private async Task LoadStrategyAsync()
+    {
+        if (MonthlyPayment <= 0) return;
+        StrategyLoading = true;
+        StrategyResult = null;
+        try
+        {
+            StrategyResult = await Api.GetAsync<PayoffStrategyResultDto>(
+                $"api/calculator/strategy?monthlyPayment={MonthlyPayment}");
+        }
+        catch
+        {
+        }
+        finally
+        {
+            StrategyLoading = false;
+        }
+    }
+
+    private async Task LoadDailyAsync()
+    {
+        DailyLoading = true;
+        try
+        {
+            DailyResult = await Api.GetAsync<DailyInterestResultDto>("api/calculator/daily-interest");
+        }
+        catch
+        {
+        }
+        finally
+        {
+            DailyLoading = false;
+        }
+    }
+
+    private static string FormatMoney(decimal val) =>
+        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
+}

@@ -1,0 +1,1359 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Debts API",
+    "description": "API para gestión de deudas, pagos y reportes financieros multi-usuario.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registra un nuevo usuario con email y contraseña.",
+        "requestBody": {
+          "description": "Datos de registro: email, name, password.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Inicia sesión con email y contraseña.",
+        "requestBody": {
+          "description": "Credenciales: email y password.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Renueva el access token usando un refresh token válido (rotación).",
+        "requestBody": {
+          "description": "Refresh token actual.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Revoca todos los refresh tokens del usuario autenticado.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Verifica que el servicio esté operativo.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Obtiene los datos del usuario autenticado a partir del token JWT.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/calculator/strategy": {
+      "get": {
+        "tags": [
+          "Calculator"
+        ],
+        "summary": "Compara las estrategias Snowball (menor saldo) vs Avalanche (mayor interés) para liquidar deudas.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/calculator/daily-interest": {
+      "get": {
+        "tags": [
+          "Calculator"
+        ],
+        "summary": "Calcula el interés diario, mensual y anual de cada deuda.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/debt-count": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene la cantidad total de deudas de un usuario.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/total-amount": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene el monto total adeudado (suma de saldos actuales).",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/total-payment-amount": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene la suma total de pagos mensuales de todas las deudas.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene un resumen completo de deudas: total, monto, pago mensual y tasa de interés promedio.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/upcoming-payments": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene las deudas con pagos próximos a vencer (DueDate >= hoy), ordenadas por fecha ascendente.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/payment-history": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene el historial completo de pagos realizados por el usuario.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/monthly-spending": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene el desglose de gastos mensuales en pagos de deudas.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/debt-projection": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Proyecta el tiempo estimado para liquidar cada deuda según el pago mensual actual.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/interest-cost": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Obtiene el costo total en intereses: monto original, saldo actual y tasa de interés promedio.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/paid-vs-pending": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Compara el total pagado vs el total pendiente, con porcentaje de avance.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/data/export/csv": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Exporta todas las deudas y pagos del usuario a un archivo CSV.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/create": {
+      "post": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Crea una nueva deuda para un usuario.",
+        "requestBody": {
+          "description": "Datos de la deuda a crear.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDebtRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDebtRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDebtRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/{id}": {
+      "get": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Obtiene una deuda por su Id.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id de la deuda.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Actualiza una deuda existente.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id de la deuda a actualizar.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Datos actualizados de la deuda.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDebtRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDebtRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDebtRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Elimina una deuda por su Id.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id de la deuda a eliminar.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/all": {
+      "get": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Obtiene todas las deudas de un usuario.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/all/paged": {
+      "get": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Obtiene todas las deudas de un usuario con paginación.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Número de página (default: 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Elementos por página (default: 10).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/{id}/pay-off": {
+      "patch": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Liquida una deuda estableciendo su saldo actual a cero.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id de la deuda a liquidar.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/search": {
+      "get": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Busca deudas por nombre (búsqueda parcial).",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Término de búsqueda.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/debt/overdue": {
+      "get": {
+        "tags": [
+          "Debts"
+        ],
+        "summary": "Obtiene las deudas vencidas (DueDate menor a la fecha actual).",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payment": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Registra un pago y reduce el saldo actual de la deuda correspondiente.",
+        "requestBody": {
+          "description": "Datos del pago (DebtId y Amount).",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payment/{id}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Obtiene un pago por su Id.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id del pago.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Actualiza el monto de un pago y ajusta el saldo de la deuda asociada.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id del pago a actualizar.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Nuevo monto del pago.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Elimina un pago y revierte el saldo de la deuda asociada.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id del pago a eliminar.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payment/debt/{debtId}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Obtiene todos los pagos de una deuda específica.",
+        "parameters": [
+          {
+            "name": "debtId",
+            "in": "path",
+            "description": "Id de la deuda.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payment/history": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Obtiene el historial de pagos de un usuario con el nombre de la deuda asociada.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payment/history/paged": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Obtiene el historial de pagos paginado con el nombre de la deuda asociada.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "header",
+            "description": "Id del usuario (header).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Número de página (default: 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Elementos por página (default: 10).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payment/debt/{debtId}/total": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Obtiene el total pagado para una deuda específica.",
+        "parameters": [
+          {
+            "name": "debtId",
+            "in": "path",
+            "description": "Id de la deuda.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/user/register": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Registra un nuevo usuario en el sistema.",
+        "requestBody": {
+          "description": "Datos del usuario a registrar.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/user/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Obtiene un usuario por su Id.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id del usuario.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Actualiza los datos de un usuario existente.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id del usuario a actualizar.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Datos actualizados.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateDebtRequest": {
+        "required": [
+          "dueDate",
+          "name",
+          "startDate",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Id del usuario propietario de la deuda.",
+            "format": "uuid"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "description": "Nombre o descripción de la deuda."
+          },
+          "originalAmount": {
+            "minimum": 0.01,
+            "type": "number",
+            "description": "Monto original de la deuda.",
+            "format": "double"
+          },
+          "currentBalance": {
+            "minimum": 0,
+            "type": "number",
+            "description": "Saldo actual pendiente.",
+            "format": "double"
+          },
+          "interestRate": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number",
+            "description": "Tasa de interés anual (0-100).",
+            "format": "double"
+          },
+          "monthlyPayment": {
+            "minimum": 0.01,
+            "type": "number",
+            "description": "Monto del pago mensual.",
+            "format": "double"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Fecha de inicio de la deuda.",
+            "format": "date-time"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Fecha de vencimiento.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud para crear una nueva deuda."
+      },
+      "CreatePaymentRequest": {
+        "required": [
+          "debtId"
+        ],
+        "type": "object",
+        "properties": {
+          "debtId": {
+            "type": "string",
+            "description": "Id de la deuda a la que se aplica el pago.",
+            "format": "uuid"
+          },
+          "amount": {
+            "minimum": 0.01,
+            "type": "number",
+            "description": "Monto del pago.",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud para registrar un nuevo pago."
+      },
+      "CreateUserRequest": {
+        "required": [
+          "email",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string",
+            "description": "Nombre del usuario."
+          },
+          "email": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string",
+            "description": "Correo electrónico del usuario."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud para registrar un nuevo usuario."
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo electrónico.",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud de inicio de sesión."
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token emitido en el login.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud de renovación de token."
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo electrónico.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Nombre del usuario.",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña (mínimo 6 caracteres).",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud de registro."
+      },
+      "UpdateDebtRequest": {
+        "required": [
+          "dueDate",
+          "name",
+          "startDate"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "description": "Nombre o descripción de la deuda."
+          },
+          "originalAmount": {
+            "minimum": 0.01,
+            "type": "number",
+            "description": "Monto original de la deuda.",
+            "format": "double"
+          },
+          "currentBalance": {
+            "minimum": 0,
+            "type": "number",
+            "description": "Saldo actual pendiente.",
+            "format": "double"
+          },
+          "interestRate": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number",
+            "description": "Tasa de interés anual (0-100).",
+            "format": "double"
+          },
+          "monthlyPayment": {
+            "minimum": 0.01,
+            "type": "number",
+            "description": "Monto del pago mensual.",
+            "format": "double"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Fecha de inicio de la deuda.",
+            "format": "date-time"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Fecha de vencimiento.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud para actualizar una deuda existente."
+      },
+      "UpdatePaymentRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "minimum": 0.01,
+            "type": "number",
+            "description": "Nuevo monto del pago.",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud para actualizar el monto de un pago."
+      },
+      "UpdateUserRequest": {
+        "required": [
+          "email",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string",
+            "description": "Nombre del usuario."
+          },
+          "email": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string",
+            "description": "Correo electrónico del usuario."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Solicitud para actualizar un usuario existente."
+      }
+    }
+  }
+}

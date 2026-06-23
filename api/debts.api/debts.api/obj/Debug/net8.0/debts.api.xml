@@ -1,0 +1,453 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>debts.api</name>
+    </assembly>
+    <members>
+        <member name="T:debts.api.Controllers.AuthController">
+            <summary>
+            Autenticación, healthcheck e información del usuario actual.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.AuthController.Register(debts.api.Controllers.RegisterRequest)">
+            <summary>
+            Registra un nuevo usuario con email y contraseña.
+            </summary>
+            <param name="body">Datos de registro: email, name, password.</param>
+            <returns>Access token, refresh token y tiempo de expiración.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.AuthController.Login(debts.api.Controllers.LoginRequest)">
+            <summary>
+            Inicia sesión con email y contraseña.
+            </summary>
+            <param name="body">Credenciales: email y password.</param>
+            <returns>Access token, refresh token y tiempo de expiración.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.AuthController.Refresh(debts.api.Controllers.RefreshRequest)">
+            <summary>
+            Renueva el access token usando un refresh token válido (rotación).
+            </summary>
+            <param name="body">Refresh token actual.</param>
+            <returns>Nuevo par access + refresh token.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.AuthController.Logout">
+            <summary>
+            Revoca todos los refresh tokens del usuario autenticado.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.AuthController.HealthCheck">
+            <summary>
+            Verifica que el servicio esté operativo.
+            </summary>
+            <returns>Estado y timestamp actual.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.AuthController.GetCurrentUser">
+            <summary>
+            Obtiene los datos del usuario autenticado a partir del token JWT.
+            </summary>
+            <returns>UserId y Name extraídos del token.</returns>
+        </member>
+        <member name="T:debts.api.Controllers.RegisterRequest">
+            <summary>
+            Solicitud de registro.
+            </summary>
+        </member>
+        <member name="P:debts.api.Controllers.RegisterRequest.Email">
+            <summary>Correo electrónico.</summary>
+        </member>
+        <member name="P:debts.api.Controllers.RegisterRequest.Name">
+            <summary>Nombre del usuario.</summary>
+        </member>
+        <member name="P:debts.api.Controllers.RegisterRequest.Password">
+            <summary>Contraseña (mínimo 6 caracteres).</summary>
+        </member>
+        <member name="T:debts.api.Controllers.LoginRequest">
+            <summary>
+            Solicitud de inicio de sesión.
+            </summary>
+        </member>
+        <member name="P:debts.api.Controllers.LoginRequest.Email">
+            <summary>Correo electrónico.</summary>
+        </member>
+        <member name="P:debts.api.Controllers.LoginRequest.Password">
+            <summary>Contraseña.</summary>
+        </member>
+        <member name="T:debts.api.Controllers.RefreshRequest">
+            <summary>
+            Solicitud de renovación de token.
+            </summary>
+        </member>
+        <member name="P:debts.api.Controllers.RefreshRequest.RefreshToken">
+            <summary>Refresh token emitido en el login.</summary>
+        </member>
+        <member name="T:debts.api.Controllers.CalculatorController">
+            <summary>
+            Calculadoras financieras: estrategias de pago e interés diario.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.CalculatorController.GetPayoffStrategy(System.Guid)">
+            <summary>
+            Compara las estrategias Snowball (menor saldo) vs Avalanche (mayor interés) para liquidar deudas.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Orden de pago recomendado para cada estrategia.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.CalculatorController.GetDailyInterest(System.Guid)">
+            <summary>
+            Calcula el interés diario, mensual y anual de cada deuda.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Desglose de intereses por deuda y totales.</returns>
+        </member>
+        <member name="T:debts.api.Controllers.DashboardController">
+            <summary>
+            Reportes y métricas del dashboard financiero.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetDebtCount(System.Guid)">
+            <summary>
+            Obtiene la cantidad total de deudas de un usuario.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Objeto con el total de deudas.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetTotalAmountDebtsAsync(System.Guid)">
+            <summary>
+            Obtiene el monto total adeudado (suma de saldos actuales).
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Objeto con el monto total.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetTotalAmountMonthlyPaymentAsync(System.Guid)">
+            <summary>
+            Obtiene la suma total de pagos mensuales de todas las deudas.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Objeto con el total de pagos mensuales.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetDebtSummary(System.Guid)">
+            <summary>
+            Obtiene un resumen completo de deudas: total, monto, pago mensual y tasa de interés promedio.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Resumen de deudas.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetUpcomingPayments(System.Guid)">
+            <summary>
+            Obtiene las deudas con pagos próximos a vencer (DueDate >= hoy), ordenadas por fecha ascendente.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de deudas próximas a vencer.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetPaymentHistory(System.Guid)">
+            <summary>
+            Obtiene el historial completo de pagos realizados por el usuario.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de pagos ordenados por fecha descendente.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetMonthlySpending(System.Guid)">
+            <summary>
+            Obtiene el desglose de gastos mensuales en pagos de deudas.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de gastos agrupados por año y mes.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetDebtProjection(System.Guid)">
+            <summary>
+            Proyecta el tiempo estimado para liquidar cada deuda según el pago mensual actual.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de proyecciones por deuda.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetInterestCost(System.Guid)">
+            <summary>
+            Obtiene el costo total en intereses: monto original, saldo actual y tasa de interés promedio.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Objeto con datos de costo de intereses.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DashboardController.GetPaidVsPending(System.Guid)">
+            <summary>
+            Compara el total pagado vs el total pendiente, con porcentaje de avance.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Objeto con total pagado, pendiente y porcentaje.</returns>
+        </member>
+        <member name="T:debts.api.Controllers.DataController">
+            <summary>
+            Exportación de datos en formatos descargables.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.DataController.ExportCsv(System.Guid)">
+            <summary>
+            Exporta todas las deudas y pagos del usuario a un archivo CSV.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Archivo CSV con deudas y pagos.</returns>
+        </member>
+        <member name="T:debts.api.Controllers.DebtsController">
+            <summary>
+            Operaciones CRUD y utilidades para la gestión de deudas.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.CreateDebt(debts.api.Requests.Debts.CreateDebtRequest)">
+            <summary>
+            Crea una nueva deuda para un usuario.
+            </summary>
+            <param name="body">Datos de la deuda a crear.</param>
+            <returns>La deuda creada con su Id asignado.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.GetById(System.Guid,System.Guid)">
+            <summary>
+            Obtiene una deuda por su Id.
+            </summary>
+            <param name="id">Id de la deuda.</param>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>La deuda si existe; 404 en caso contrario.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.GetAllDebts(System.Guid)">
+            <summary>
+            Obtiene todas las deudas de un usuario.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de deudas.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.GetAllDebtsPaged(System.Guid,System.Int32,System.Int32)">
+            <summary>
+            Obtiene todas las deudas de un usuario con paginación.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <param name="page">Número de página (default: 1).</param>
+            <param name="pageSize">Elementos por página (default: 10).</param>
+            <returns>Lista paginada de deudas con total de registros.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.UpdateDebt(System.Guid,System.Guid,debts.api.Requests.Debts.UpdateDebtRequest)">
+            <summary>
+            Actualiza una deuda existente.
+            </summary>
+            <param name="id">Id de la deuda a actualizar.</param>
+            <param name="userId">Id del usuario (header).</param>
+            <param name="body">Datos actualizados de la deuda.</param>
+            <returns>La deuda actualizada; 404 si no existe.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.DeleteDebt(System.Guid,System.Guid)">
+            <summary>
+            Elimina una deuda por su Id.
+            </summary>
+            <param name="id">Id de la deuda a eliminar.</param>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>204 si se eliminó; 404 si no existe.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.PayOffDebt(System.Guid,System.Guid)">
+            <summary>
+            Liquida una deuda estableciendo su saldo actual a cero.
+            </summary>
+            <param name="id">Id de la deuda a liquidar.</param>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>204 si se liquidó; 404 si no existe.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.SearchDebts(System.Guid,System.String)">
+            <summary>
+            Busca deudas por nombre (búsqueda parcial).
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <param name="q">Término de búsqueda.</param>
+            <returns>Lista de deudas que coinciden con el término.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.DebtsController.GetOverdueDebts(System.Guid)">
+            <summary>
+            Obtiene las deudas vencidas (DueDate menor a la fecha actual).
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de deudas vencidas.</returns>
+        </member>
+        <member name="T:debts.api.Controllers.PaymentsController">
+            <summary>
+            Operaciones CRUD y consultas para pagos asociados a deudas.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.CreatePayment(debts.api.Requests.Payments.CreatePaymentRequest)">
+            <summary>
+            Registra un pago y reduce el saldo actual de la deuda correspondiente.
+            </summary>
+            <param name="body">Datos del pago (DebtId y Amount).</param>
+            <returns>El pago creado con su Id asignado.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.GetById(System.Guid)">
+            <summary>
+            Obtiene un pago por su Id.
+            </summary>
+            <param name="id">Id del pago.</param>
+            <returns>El pago si existe; 404 en caso contrario.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.GetByDebtId(System.Guid)">
+            <summary>
+            Obtiene todos los pagos de una deuda específica.
+            </summary>
+            <param name="debtId">Id de la deuda.</param>
+            <returns>Lista de pagos ordenados por fecha descendente.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.UpdatePayment(System.Guid,debts.api.Requests.Payments.UpdatePaymentRequest)">
+            <summary>
+            Actualiza el monto de un pago y ajusta el saldo de la deuda asociada.
+            </summary>
+            <param name="id">Id del pago a actualizar.</param>
+            <param name="body">Nuevo monto del pago.</param>
+            <returns>204 si se actualizó; 404 si no existe.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.DeletePayment(System.Guid)">
+            <summary>
+            Elimina un pago y revierte el saldo de la deuda asociada.
+            </summary>
+            <param name="id">Id del pago a eliminar.</param>
+            <returns>204 si se eliminó; 404 si no existe.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.GetHistory(System.Guid)">
+            <summary>
+            Obtiene el historial de pagos de un usuario con el nombre de la deuda asociada.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <returns>Lista de pagos con nombre de deuda.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.GetHistoryPaged(System.Guid,System.Int32,System.Int32)">
+            <summary>
+            Obtiene el historial de pagos paginado con el nombre de la deuda asociada.
+            </summary>
+            <param name="userId">Id del usuario (header).</param>
+            <param name="page">Número de página (default: 1).</param>
+            <param name="pageSize">Elementos por página (default: 10).</param>
+            <returns>Lista paginada de pagos con total de registros.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.PaymentsController.GetTotalByDebt(System.Guid)">
+            <summary>
+            Obtiene el total pagado para una deuda específica.
+            </summary>
+            <param name="debtId">Id de la deuda.</param>
+            <returns>Objeto con el total pagado.</returns>
+        </member>
+        <member name="T:debts.api.Controllers.UsersController">
+            <summary>
+            Gestión de usuarios del sistema.
+            </summary>
+        </member>
+        <member name="M:debts.api.Controllers.UsersController.Register(debts.api.Requests.Users.CreateUserRequest)">
+            <summary>
+            Registra un nuevo usuario en el sistema.
+            </summary>
+            <param name="body">Datos del usuario a registrar.</param>
+            <returns>El usuario creado con su Id asignado.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.UsersController.GetById(System.Guid)">
+            <summary>
+            Obtiene un usuario por su Id.
+            </summary>
+            <param name="id">Id del usuario.</param>
+            <returns>El usuario si existe; 404 en caso contrario.</returns>
+        </member>
+        <member name="M:debts.api.Controllers.UsersController.Update(System.Guid,debts.api.Requests.Users.UpdateUserRequest)">
+            <summary>
+            Actualiza los datos de un usuario existente.
+            </summary>
+            <param name="id">Id del usuario a actualizar.</param>
+            <param name="body">Datos actualizados.</param>
+            <returns>El usuario actualizado; 404 si no existe.</returns>
+        </member>
+        <member name="T:debts.api.Requests.Debts.CreateDebtRequest">
+            <summary>
+            Solicitud para crear una nueva deuda.
+            </summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.UserId">
+            <summary>Id del usuario propietario de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.Name">
+            <summary>Nombre o descripción de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.OriginalAmount">
+            <summary>Monto original de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.CurrentBalance">
+            <summary>Saldo actual pendiente.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.InterestRate">
+            <summary>Tasa de interés anual (0-100).</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.MonthlyPayment">
+            <summary>Monto del pago mensual.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.StartDate">
+            <summary>Fecha de inicio de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.CreateDebtRequest.DueDate">
+            <summary>Fecha de vencimiento.</summary>
+        </member>
+        <member name="T:debts.api.Requests.Debts.UpdateDebtRequest">
+            <summary>
+            Solicitud para actualizar una deuda existente.
+            </summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.Name">
+            <summary>Nombre o descripción de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.OriginalAmount">
+            <summary>Monto original de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.CurrentBalance">
+            <summary>Saldo actual pendiente.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.InterestRate">
+            <summary>Tasa de interés anual (0-100).</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.MonthlyPayment">
+            <summary>Monto del pago mensual.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.StartDate">
+            <summary>Fecha de inicio de la deuda.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Debts.UpdateDebtRequest.DueDate">
+            <summary>Fecha de vencimiento.</summary>
+        </member>
+        <member name="T:debts.api.Requests.Payments.CreatePaymentRequest">
+            <summary>
+            Solicitud para registrar un nuevo pago.
+            </summary>
+        </member>
+        <member name="P:debts.api.Requests.Payments.CreatePaymentRequest.DebtId">
+            <summary>Id de la deuda a la que se aplica el pago.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Payments.CreatePaymentRequest.Amount">
+            <summary>Monto del pago.</summary>
+        </member>
+        <member name="T:debts.api.Requests.Payments.UpdatePaymentRequest">
+            <summary>
+            Solicitud para actualizar el monto de un pago.
+            </summary>
+        </member>
+        <member name="P:debts.api.Requests.Payments.UpdatePaymentRequest.Amount">
+            <summary>Nuevo monto del pago.</summary>
+        </member>
+        <member name="T:debts.api.Requests.Users.CreateUserRequest">
+            <summary>
+            Solicitud para registrar un nuevo usuario.
+            </summary>
+        </member>
+        <member name="P:debts.api.Requests.Users.CreateUserRequest.Name">
+            <summary>Nombre del usuario.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Users.CreateUserRequest.Email">
+            <summary>Correo electrónico del usuario.</summary>
+        </member>
+        <member name="T:debts.api.Requests.Users.UpdateUserRequest">
+            <summary>
+            Solicitud para actualizar un usuario existente.
+            </summary>
+        </member>
+        <member name="P:debts.api.Requests.Users.UpdateUserRequest.Name">
+            <summary>Nombre del usuario.</summary>
+        </member>
+        <member name="P:debts.api.Requests.Users.UpdateUserRequest.Email">
+            <summary>Correo electrónico del usuario.</summary>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,57 @@
+﻿@inject AuthService Auth
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Nav
+
+<div class="navbar-brand">DebtsApp</div>
+
+<nav class="nav flex-column">
+    <div class="nav-item">
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            Inicio
+        </NavLink>
+    </div>
+
+    <AuthorizeView>
+        <Authorized>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="debts">
+                    Deudas
+                </NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="dashboard">
+                    Dashboard
+                </NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="calculator">
+                    Calculadora
+                </NavLink>
+            </div>
+        </Authorized>
+    </AuthorizeView>
+</nav>
+
+<div class="sidebar-footer">
+    <AuthorizeView>
+        <Authorized>
+            <a class="nav-link" href="javascript:void(0)" @onclick="LogoutAsync">
+                Cerrar sesión
+            </a>
+        </Authorized>
+        <NotAuthorized>
+            <NavLink class="nav-link" href="login">
+                Iniciar sesión
+            </NavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+        await ((CustomAuthStateProvider)AuthState).NotifyAuthStateChanged();
+        Nav.NavigateTo("/login");
+    }
+}
