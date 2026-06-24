@@ -1,0 +1,269 @@
+@page "/pagos"
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Pagos</PageTitle>
+
+<h3 class="mb-4">Pagos</h3>
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link @(ActiveSubTab == "register" ? "active" : "")" href="javascript:void(0)" @onclick="ShowRegister">Registrar pago</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(ActiveSubTab == "history" ? "active" : "")" href="javascript:void(0)" @onclick="ShowHistory">Historial</a>
+    </li>
+</ul>
+
+@if (ActiveSubTab == "register")
+{
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Registrar pago</h5>
+
+        @if (!string.IsNullOrEmpty(SuccessMessage))
+        {
+            <div class="alert alert-success">@SuccessMessage</div>
+        }
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger">@ErrorMessage</div>
+        }
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Deuda</label>
+                <select @bind="FormDebtId" class="form-select">
+                    <option value="">Seleccionar...</option>
+                    @foreach (var d in DebtList)
+                    {
+                        <option value="@d.Id">@d.Name — @FormatMoney(d.CurrentBalance)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Tipo de pago</label>
+                <select @bind="FormPaymentType" class="form-select">
+                    <option value="regular">Pago cotidiano</option>
+                    <option value="prepayment">Prepago</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Monto ($)</label>
+                <input type="number" min="0.01" step="0.01" @bind="FormAmount" class="form-control" />
+            </div>
+        </div>
+
+        @if (FormPaymentType == "prepayment")
+        {
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">Efecto del prepago</label>
+                    <select @bind="FormPrepaymentEffect" class="form-select">
+                        <option value="reduceTerm">Reducir plazo - quita meses al final</option>
+                        <option value="reducePayment">Reducir cuota - baja el pago mensual</option>
+                    </select>
+                </div>
+            </div>
+        }
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="FormWasOnTime" id="wasOnTime" />
+                    <label class="form-check-label" for="wasOnTime">Pagado a tiempo</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <button class="btn btn-primary" @onclick="RegisterPaymentAsync" disabled="@FormLoading">
+                Registrar pago
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    @* ───── Historial ───── *@
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Historial de pagos</h5>
+
+        @if (HistoryLoading)
+        {
+            <div class="d-flex justify-content-center py-3">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            </div>
+        }
+        else if (HistoryItems.Count == 0)
+        {
+            <p class="text-muted">No hay pagos registrados.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Deuda</th>
+                            <th>Monto</th>
+                            <th>Tipo</th>
+                            <th>A tiempo</th>
+                            <th>Efecto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in HistoryItems)
+                        {
+                            <tr>
+                                <td>@p.PaymentDate.ToString("dd/MM/yyyy")</td>
+                                <td>@p.DebtName</td>
+                                <td class="negative">@FormatMoney(p.Amount)</td>
+                                <td>@TipoLabel(p.PaymentType)</td>
+                                <td>@OnTimeLabel(p.WasOnTime)</td>
+                                <td>@EffectLabel(p.PrepaymentEffect)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string ActiveSubTab = "register";
+    private string? ErrorMessage;
+    private string? SuccessMessage;
+
+    private void ShowRegister() { ActiveSubTab = "register"; ErrorMessage = null; SuccessMessage = null; }
+    private void ShowHistory() { ActiveSubTab = "history"; ErrorMessage = null; SuccessMessage = null; }
+
+    private List<DebtDto> DebtList = new();
+
+    // Form
+    private Guid? FormDebtId;
+    private string FormPaymentType = "regular";
+    private decimal FormAmount = 0;
+    private bool FormWasOnTime = true;
+    private string? FormPrepaymentEffect = "reduceTerm";
+    private bool FormLoading;
+
+    // History
+    private bool HistoryLoading;
+    private List<PaymentHistoryDto> HistoryItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadDebtsAsync();
+            await LoadHistoryAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadDebtsAsync()
+    {
+        try
+        {
+            DebtList = await Api.GetAsync<List<DebtDto>>("api/debt/all") ?? new();
+        }
+        catch { }
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        HistoryLoading = true;
+        try
+        {
+            HistoryItems = await Api.GetAsync<List<PaymentHistoryDto>>("api/payment/history") ?? new();
+        }
+        catch { }
+        finally
+        {
+            HistoryLoading = false;
+        }
+    }
+
+    private async Task RegisterPaymentAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!FormDebtId.HasValue)
+        {
+            ErrorMessage = "Selecciona una deuda.";
+            return;
+        }
+        if (FormAmount <= 0)
+        {
+            ErrorMessage = "El monto debe ser mayor a 0.";
+            return;
+        }
+        if (FormPaymentType == "prepayment" && string.IsNullOrEmpty(FormPrepaymentEffect))
+        {
+            ErrorMessage = "Selecciona el efecto del prepago.";
+            return;
+        }
+
+        FormLoading = true;
+        try
+        {
+            var body = new CreatePaymentRequest
+            {
+                DebtId = FormDebtId.Value,
+                Amount = FormAmount,
+                PaymentType = FormPaymentType,
+                WasOnTime = FormWasOnTime,
+                PrepaymentEffect = FormPaymentType == "prepayment" ? FormPrepaymentEffect : null
+            };
+            await Api.PostAsync<PaymentDto>("api/payment", body);
+            SuccessMessage = "Pago registrado correctamente.";
+            FormDebtId = null;
+            FormPaymentType = "regular";
+            FormAmount = 0;
+            FormWasOnTime = true;
+            FormPrepaymentEffect = "reduceTerm";
+            await LoadHistoryAsync();
+        }
+        catch
+        {
+            ErrorMessage = "Error al registrar el pago. Verifica los datos.";
+        }
+        finally
+        {
+            FormLoading = false;
+        }
+    }
+
+    private static string TipoLabel(string t) => t switch
+    {
+        "prepayment" => "Prepago",
+        _ => "Cotidiano"
+    };
+
+    private static string OnTimeLabel(bool ot) =>
+        ot ? "Sí" : "No";
+
+    private static string EffectLabel(string? e) => e switch
+    {
+        "reduceTerm" => "Reducir plazo",
+        "reducePayment" => "Reducir cuota",
+        _ => "—"
+    };
+
+    private static string FormatMoney(decimal val) =>
+        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
+}

@@ -1,0 +1,234 @@
+@page "/"
+@page "/dashboard"
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Dashboard</PageTitle>
+
+<h3 class="mb-4">Dashboard</h3>
+
+@if (Summary == null)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total deudas</div>
+            <div class="stat-value neutral">@Summary.TotalDebts</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Saldo total</div>
+            <div class="stat-value negative">@FormatMoney(Summary.TotalAmount)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Pago mensual total</div>
+            <div class="stat-value negative">@FormatMoney(Summary.TotalMonthlyPayment)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Tasa de interés promedio</div>
+            <div class="stat-value neutral">@Summary.AverageInterestRate.ToString("N1")%</div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        @* ───── Próximos pagos ───── *@
+        <div class="col-md-6">
+            <div class="card p-3 h-100">
+                <h5 class="section-title">Próximos pagos</h5>
+                @if (Upcoming == null)
+                {
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                }
+                else if (Upcoming.Count == 0)
+                {
+                    <p class="text-muted small mb-0">No hay pagos próximos.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Deuda</th>
+                                    <th>Monto</th>
+                                    <th>Vence</th>
+                                    <th>Días</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in Upcoming)
+                                {
+                                    <tr class="@(p.DaysUntilDue <= 7 ? "table-warning" : "")">
+                                        <td>@p.DebtName</td>
+                                        <td>@FormatMoney(p.Amount)</td>
+                                        <td>@p.DueDate.ToShortDateString()</td>
+                                        <td>@p.DaysUntilDue días</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ───── Historial de pagos ───── *@
+        <div class="col-md-6">
+            <div class="card p-3 h-100">
+                <h5 class="section-title">Últimos pagos</h5>
+                @if (History == null)
+                {
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                }
+                else if (History.Count == 0)
+                {
+                    <p class="text-muted small mb-0">No hay pagos registrados.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Deuda</th>
+                                    <th>Monto</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in History)
+                                {
+                                    <tr>
+                                        <td>@p.DebtName</td>
+                                        <td class="negative">@FormatMoney(p.Amount)</td>
+                                        <td>@p.PaymentDate.ToShortDateString()</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ───── Pagado vs Pendiente ───── *@
+        <div class="col-md-6">
+            <div class="card p-3">
+                <h5 class="section-title">Pagado vs Pendiente</h5>
+                @if (PaidVsPending == null)
+                {
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                }
+                else
+                {
+                    <div class="d-flex gap-4">
+                        <div>
+                            <div class="stat-label">Pagado</div>
+                            <div class="stat-value positive" style="font-size:1.4rem">@FormatMoney(PaidVsPending.TotalPaid)</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Pendiente</div>
+                            <div class="stat-value negative" style="font-size:1.4rem">@FormatMoney(PaidVsPending.TotalPending)</div>
+                        </div>
+                    </div>
+                    <div class="progress mt-2" style="height:8px">
+                        <div class="progress-bar bg-success" style="width:@(PaidPct)%"></div>
+                        <div class="progress-bar bg-danger" style="width:@(100 - PaidPct)%"></div>
+                    </div>
+                    <small class="text-muted">@PaidPct.ToString("N0")% pagado</small>
+                }
+            </div>
+        </div>
+
+        @* ───── Costo de intereses ───── *@
+        <div class="col-md-6">
+            <div class="card p-3">
+                <h5 class="section-title">Costo de intereses</h5>
+                @if (InterestCost == null)
+                {
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                }
+                else if (InterestCost.Count == 0)
+                {
+                    <p class="text-muted small mb-0">No hay datos.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Deuda</th>
+                                    <th>Pagado</th>
+                                    <th>Restante</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in InterestCost)
+                                {
+                                    <tr>
+                                        <td>@c.DebtName</td>
+                                        <td>@FormatMoney(c.TotalInterestPaid)</td>
+                                        <td class="negative">@FormatMoney(c.RemainingInterest)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private DebtSummaryDto? Summary;
+    private List<UpcomingPaymentDto>? Upcoming;
+    private List<PaymentHistoryDto>? History;
+    private PaidVsPendingDto? PaidVsPending;
+    private List<InterestCostDto>? InterestCost;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        try
+        {
+            Summary = await Api.GetAsync<DebtSummaryDto>("api/dashboard/summary");
+        }
+        catch
+        {
+            Summary = new DebtSummaryDto();
+        }
+
+        try { Upcoming = await Api.GetAsync<List<UpcomingPaymentDto>>("api/dashboard/upcoming-payments"); } catch { Upcoming = new(); }
+        try { History = await Api.GetAsync<List<PaymentHistoryDto>>("api/dashboard/payment-history"); } catch { History = new(); }
+        try { PaidVsPending = await Api.GetAsync<PaidVsPendingDto>("api/dashboard/paid-vs-pending"); } catch { PaidVsPending = new(); }
+        try { InterestCost = await Api.GetAsync<List<InterestCostDto>>("api/dashboard/interest-cost"); } catch { InterestCost = new(); }
+    }
+
+    private decimal PaidPct
+    {
+        get
+        {
+            if (PaidVsPending == null) return 0;
+            var total = PaidVsPending.TotalPaid + PaidVsPending.TotalPending;
+            return total > 0 ? Math.Round(PaidVsPending.TotalPaid / total * 100) : 0;
+        }
+    }
+
+    private static string FormatMoney(decimal val) =>
+        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
+}
