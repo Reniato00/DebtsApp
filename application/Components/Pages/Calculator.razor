@@ -1,5 +1,8 @@
 @page "/calculator"
-@inject ApiClient Api
+@using domain.Entities
+@using services.Models
+@inject services.Services.ICalculatorService CalcService
+@inject services.Services.IDebtService DebtService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 
@@ -54,6 +57,17 @@
                     </a>
                 </li>
             </ul>
+
+            <div class="alert alert-info py-2 small mb-3">
+                @if (ShowAvalanche)
+                {
+                    <text><strong>Avalanche:</strong> Ordena las deudas de mayor a menor tasa de inter&eacute;s. Pagas el m&iacute;nimo en todas excepto la de inter&eacute;s m&aacute;s alto. Es la estrategia &oacute;ptima matem&aacute;ticamente &mdash; pagar&aacute;s menos intereses totales.</text>
+                }
+                else
+                {
+                    <text><strong>Snowball:</strong> Ordena las deudas de menor a mayor saldo. Pagas el m&iacute;nimo en todas excepto la m&aacute;s peque&ntilde;a. La ventaja es psicol&oacute;gica &mdash; al liquidar deudas r&aacute;pido te motiva a seguir.</text>
+                }
+            </div>
 
             var steps = Steps;
             var totalMonths = TotalMonths;
@@ -269,10 +283,10 @@ else if (ActiveTab == "prepayment")
     // Strategy
     private decimal MonthlyPayment = 1000;
     private bool StrategyLoading;
-    private PayoffStrategyResultDto? StrategyResult;
+    private PayoffStrategyResult? StrategyResult;
     private bool ShowAvalanche;
 
-    private List<PayoffStepDto> Steps =>
+    private List<PayoffStep> Steps =>
         ShowAvalanche ? (StrategyResult?.Avalanche ?? new()) : (StrategyResult?.Snowball ?? new());
 
     private int TotalMonths =>
@@ -280,14 +294,16 @@ else if (ActiveTab == "prepayment")
 
     // Daily
     private bool DailyLoading;
-    private DailyInterestResultDto? DailyResult;
+    private DailyInterestResult? DailyResult;
 
     // Prepayment
-    private List<DebtDto> DebtList = new();
+    private List<Debt> DebtList = new();
     private Guid? PrepaymentDebtId;
     private decimal PrepaymentExtraAmount = 0;
     private bool PrepaymentLoading;
-    private PrepaymentAnalysisResultDto? PrepaymentResult;
+    private PrepaymentAnalysisResult? PrepaymentResult;
+
+    private Guid UserId;
 
     private void ShowStrategy() { ActiveTab = "strategy"; ErrorMessage = null; }
     private void ShowDaily() { ActiveTab = "daily"; ErrorMessage = null; }
@@ -297,6 +313,13 @@ else if (ActiveTab == "prepayment")
     {
         var auth = await AuthState.GetAuthenticationStateAsync();
         if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(uid, out UserId))
         {
             Nav.NavigateTo("/login");
             return;
@@ -318,7 +341,7 @@ else if (ActiveTab == "prepayment")
     {
         try
         {
-            DebtList = await Api.GetAsync<List<DebtDto>>("api/debt/all") ?? new();
+            DebtList = (await DebtService.GetAllDebtsAsync(UserId)).ToList();
         }
         catch
         {
@@ -332,8 +355,7 @@ else if (ActiveTab == "prepayment")
         StrategyResult = null;
         try
         {
-            StrategyResult = await Api.GetAsync<PayoffStrategyResultDto>(
-                $"api/calculator/strategy?monthlyPayment={MonthlyPayment}");
+            StrategyResult = await CalcService.GetPayoffStrategyAsync(UserId, MonthlyPayment);
         }
         catch
         {
@@ -349,7 +371,7 @@ else if (ActiveTab == "prepayment")
         DailyLoading = true;
         try
         {
-            DailyResult = await Api.GetAsync<DailyInterestResultDto>("api/calculator/daily-interest");
+            DailyResult = await CalcService.GetDailyInterestAsync(UserId);
         }
         catch
         {
@@ -378,9 +400,8 @@ else if (ActiveTab == "prepayment")
         PrepaymentResult = null;
         try
         {
-            PrepaymentResult = await Api.PostAsync<PrepaymentAnalysisResultDto>(
-                "api/calculator/prepayment-analysis",
-                new PrepaymentAnalysisRequestDto { DebtId = PrepaymentDebtId.Value, ExtraAmount = PrepaymentExtraAmount });
+            PrepaymentResult = await CalcService.AnalyzePrepaymentAsync(UserId,
+                new PrepaymentAnalysisRequest { DebtId = PrepaymentDebtId.Value, ExtraAmount = PrepaymentExtraAmount });
         }
         catch
         {

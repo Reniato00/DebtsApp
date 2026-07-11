@@ -1,6 +1,8 @@
 @page "/"
 @page "/dashboard"
-@inject ApiClient Api
+@using persistence.Models
+@inject services.Services.IDashboardService DashboardSvc
+@inject services.Services.IPaymentService PaymentService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 
@@ -174,7 +176,7 @@ else
                                 @foreach (var c in InterestCost)
                                 {
                                     <tr>
-                                        <td>@c.DebtName</td>
+                                        <td>@c.Name</td>
                                         <td>@FormatMoney(c.TotalInterestPaid)</td>
                                         <td class="negative">@FormatMoney(c.RemainingInterest)</td>
                                     </tr>
@@ -189,11 +191,13 @@ else
 }
 
 @code {
-    private DebtSummaryDto? Summary;
-    private List<UpcomingPaymentDto>? Upcoming;
-    private List<PaymentHistoryDto>? History;
-    private PaidVsPendingDto? PaidVsPending;
-    private List<InterestCostDto>? InterestCost;
+    private DebtSummaryResult? Summary;
+    private List<UpcomingPaymentItem>? Upcoming;
+    private List<PaymentWithDebtName>? History;
+    private services.Models.PaidVsPendingResult? PaidVsPending;
+    private List<DebtInterestItem>? InterestCost;
+
+    private Guid UserId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -204,19 +208,51 @@ else
             return;
         }
 
-        try
+        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(uid, out UserId))
         {
-            Summary = await Api.GetAsync<DebtSummaryDto>("api/dashboard/summary");
-        }
-        catch
-        {
-            Summary = new DebtSummaryDto();
+            Nav.NavigateTo("/login");
+            return;
         }
 
-        try { Upcoming = await Api.GetAsync<List<UpcomingPaymentDto>>("api/dashboard/upcoming-payments"); } catch { Upcoming = new(); }
-        try { History = await Api.GetAsync<List<PaymentHistoryDto>>("api/dashboard/payment-history"); } catch { History = new(); }
-        try { PaidVsPending = await Api.GetAsync<PaidVsPendingDto>("api/dashboard/paid-vs-pending"); } catch { PaidVsPending = new(); }
-        try { InterestCost = await Api.GetAsync<List<InterestCostDto>>("api/dashboard/interest-cost"); } catch { InterestCost = new(); }
+        try { Summary = await DashboardSvc.GetDebtSummaryAsync(UserId); } catch { Summary = new(); }
+        try
+        {
+            var debts = await DashboardSvc.GetUpcomingPaymentsAsync(UserId);
+            Upcoming = debts.Select(d => new UpcomingPaymentItem
+            {
+                DebtId = d.Id,
+                DebtName = d.Name,
+                Amount = d.MonthlyPayment,
+                DueDate = d.DueDate,
+                DaysUntilDue = Math.Max(0, (int)(d.DueDate.Date - DateTime.UtcNow.Date).TotalDays)
+            }).ToList();
+        }
+        catch { Upcoming = new(); }
+
+        try { History = (await PaymentService.GetPaymentHistoryWithDebtNameAsync(UserId)).ToList(); } catch { History = new(); }
+        try { PaidVsPending = await DashboardSvc.GetPaidVsPendingAsync(UserId); } catch { PaidVsPending = new(); }
+        try
+        {
+            var allDebts = await DashboardSvc.GetUpcomingPaymentsAsync(UserId);
+            InterestCost = allDebts.Select(d =>
+            {
+                var monthlyRate = (double)(d.InterestRate / 100m / 12m);
+                double balance = (double)d.CurrentBalance;
+                double payment = (double)d.MonthlyPayment;
+                var months = payment > 0 && monthlyRate > 0 && payment > balance * monthlyRate
+                    ? (int)Math.Ceiling(Math.Log(payment / (payment - balance * monthlyRate)) / Math.Log(1 + monthlyRate))
+                    : 0;
+                var totalInterest = months > 0 ? (decimal)(months * payment - balance) : 0;
+                return new DebtInterestItem
+                {
+                    Name = d.Name,
+                    TotalInterestPaid = 0,
+                    RemainingInterest = Math.Round(Math.Max(0, totalInterest), 2)
+                };
+            }).ToList();
+        }
+        catch { InterestCost = new(); }
     }
 
     private decimal PaidPct
@@ -231,4 +267,20 @@ else
 
     private static string FormatMoney(decimal val) =>
         val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
+
+    private class UpcomingPaymentItem
+    {
+        public Guid DebtId { get; set; }
+        public string DebtName { get; set; } = "";
+        public decimal Amount { get; set; }
+        public DateTime DueDate { get; set; }
+        public int DaysUntilDue { get; set; }
+    }
+
+    private class DebtInterestItem
+    {
+        public string Name { get; set; } = "";
+        public decimal TotalInterestPaid { get; set; }
+        public decimal RemainingInterest { get; set; }
+    }
 }

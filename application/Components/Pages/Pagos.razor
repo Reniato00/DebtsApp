@@ -1,5 +1,8 @@
 @page "/pagos"
-@inject ApiClient Api
+@using domain.Entities
+@using persistence.Models
+@inject services.Services.IDebtService DebtService
+@inject services.Services.IPaymentService PaymentService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 
@@ -137,10 +140,10 @@ else
     private string? ErrorMessage;
     private string? SuccessMessage;
 
-    private void ShowRegister() { ActiveSubTab = "register"; ErrorMessage = null; SuccessMessage = null; }
+    private async Task ShowRegister() { ActiveSubTab = "register"; ErrorMessage = null; SuccessMessage = null; await LoadDebtsAsync(); }
     private void ShowHistory() { ActiveSubTab = "history"; ErrorMessage = null; SuccessMessage = null; }
 
-    private List<DebtDto> DebtList = new();
+    private List<Debt> DebtList = new();
 
     // Form
     private Guid? FormDebtId;
@@ -152,12 +155,21 @@ else
 
     // History
     private bool HistoryLoading;
-    private List<PaymentHistoryDto> HistoryItems = new();
+    private List<PaymentWithDebtName> HistoryItems = new();
+
+    private Guid UserId;
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthState.GetAuthenticationStateAsync();
         if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(uid, out UserId))
         {
             Nav.NavigateTo("/login");
             return;
@@ -178,7 +190,7 @@ else
     {
         try
         {
-            DebtList = await Api.GetAsync<List<DebtDto>>("api/debt/all") ?? new();
+            DebtList = (await DebtService.GetAllDebtsAsync(UserId)).ToList();
         }
         catch { }
     }
@@ -188,7 +200,7 @@ else
         HistoryLoading = true;
         try
         {
-            HistoryItems = await Api.GetAsync<List<PaymentHistoryDto>>("api/payment/history") ?? new();
+            HistoryItems = (await PaymentService.GetPaymentHistoryWithDebtNameAsync(UserId)).ToList();
         }
         catch { }
         finally
@@ -221,16 +233,11 @@ else
         FormLoading = true;
         try
         {
-            var body = new CreatePaymentRequest
-            {
-                DebtId = FormDebtId.Value,
-                Amount = FormAmount,
-                PaymentType = FormPaymentType,
-                WasOnTime = FormWasOnTime,
-                PrepaymentEffect = FormPaymentType == "prepayment" ? FormPrepaymentEffect : null
-            };
-            await Api.PostAsync<PaymentDto>("api/payment", body);
+            await PaymentService.CreatePaymentAsync(
+                FormDebtId.Value, FormAmount, FormPaymentType, FormWasOnTime,
+                FormPaymentType == "prepayment" ? FormPrepaymentEffect : null);
             SuccessMessage = "Pago registrado correctamente.";
+            await LoadDebtsAsync();
             FormDebtId = null;
             FormPaymentType = "regular";
             FormAmount = 0;

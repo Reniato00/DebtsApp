@@ -1,6 +1,6 @@
 @page "/login"
 @layout Layout.BlankLayout
-@inject AuthService Auth
+@inject services.Services.IAuthService Auth
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
 
@@ -84,6 +84,8 @@
                 return;
             }
 
+            var provider = (application.Auth.CustomAuthStateProvider)AuthState;
+
             if (ShowRegister)
             {
                 if (string.IsNullOrWhiteSpace(Name))
@@ -91,14 +93,17 @@
                     Error = "El nombre es requerido";
                     return;
                 }
-                await Auth.RegisterAsync(Email, Name, Password);
+                var (accessToken, _, _) = await Auth.RegisterAsync(Email, Name, Password);
+                var (userId, userName) = DecodeToken(accessToken);
+                provider.SignIn(userId, userName);
             }
             else
             {
-                await Auth.LoginAsync(Email, Password);
+                var (accessToken, _, _) = await Auth.LoginAsync(Email, Password);
+                var (userId, userName) = DecodeToken(accessToken);
+                provider.SignIn(userId, userName);
             }
 
-            await ((CustomAuthStateProvider)AuthState).NotifyAuthStateChanged();
             Nav.NavigateTo("/dashboard");
         }
         catch (Exception ex)
@@ -109,5 +114,33 @@
         {
             Loading = false;
         }
+    }
+
+    private static (Guid userId, string userName) DecodeToken(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return (Guid.Empty, "");
+            var payload = parts[1];
+            var len = payload.Length % 4;
+            if (len == 2) payload += "==";
+            else if (len == 3) payload += "=";
+            payload = payload.Replace('-', '+').Replace('_', '/');
+            var bytes = Convert.FromBase64String(payload);
+            var json = System.Text.Encoding.UTF8.GetString(bytes);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var uid = Guid.Empty;
+            foreach (var key in new[] { "nameid", "sub", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier" })
+                if (doc.RootElement.TryGetProperty(key, out var prop) && Guid.TryParse(prop.GetString(), out uid))
+                    break;
+            var name = "";
+            foreach (var key in new[] { "unique_name", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name" })
+                if (doc.RootElement.TryGetProperty(key, out var prop))
+                    name = prop.GetString() ?? "";
+            return (uid, name);
+        }
+        catch { }
+        return (Guid.Empty, "");
     }
 }
