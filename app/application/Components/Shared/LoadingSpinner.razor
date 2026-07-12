@@ -1,0 +1,21 @@
+@if (FullPage)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">@Text</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-center py-3">
+        <div class="spinner-border text-primary spinner-border-sm" role="status">
+            <span class="visually-hidden">@Text</span>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool FullPage { get; set; }
+    [Parameter] public string Text { get; set; } = "Cargando...";
+}

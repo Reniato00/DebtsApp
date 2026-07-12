@@ -1,0 +1,13 @@
+<div class="text-center py-5 text-muted">
+    <p style="font-size:1.2rem">@Message</p>
+    @if (!string.IsNullOrEmpty(ActionLabel))
+    {
+        <button class="btn btn-outline-primary" @onclick="OnAction">@ActionLabel</button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "No hay datos";
+    [Parameter] public string? ActionLabel { get; set; }
+    [Parameter] public EventCallback OnAction { get; set; }
+}

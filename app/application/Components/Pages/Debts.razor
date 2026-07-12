@@ -22,22 +22,15 @@
 
 @if (Loading)
 {
-    <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Cargando...</span>
-        </div>
-    </div>
+    <LoadingSpinner FullPage="true" />
 }
 else if (ErrorMsg != null)
 {
-    <div class="alert alert-danger">@ErrorMsg</div>
+    <AlertMessage Message="@ErrorMsg" />
 }
 else if (DebtList.Count == 0)
 {
-    <div class="text-center py-5 text-muted">
-        <p style="font-size:1.2rem">No hay deudas registradas</p>
-        <button class="btn btn-outline-primary" @onclick="() => OpenCreate()">Crear primera deuda</button>
-    </div>
+    <EmptyState Message="No hay deudas registradas" ActionLabel="Crear primera deuda" OnAction="OpenCreate" />
 }
 else
 {
@@ -59,10 +52,10 @@ else
                 {
                     <tr class="@(IsOverdue(d) ? "table-danger" : "")">
                         <td><strong>@d.Name</strong></td>
-                        <td class="negative">@FormatMoney(d.CurrentBalance)</td>
-                        <td>@FormatMoney(d.OriginalAmount)</td>
+                        <td class="negative">@FormattingHelpers.FormatMoney(d.CurrentBalance)</td>
+                        <td>@FormattingHelpers.FormatMoney(d.OriginalAmount)</td>
                         <td>@d.InterestRate.ToString("N1")%</td>
-                        <td>@FormatMoney(d.MonthlyPayment)</td>
+                        <td>@FormattingHelpers.FormatMoney(d.MonthlyPayment)</td>
                         <td>
                             @d.DueDate.ToShortDateString()
                             @if (IsOverdue(d))
@@ -84,139 +77,81 @@ else
         </table>
     </div>
 
-    <nav>
-        <ul class="pagination pagination-sm justify-content-center">
-            <li class="page-item @(Page <= 1 ? "disabled" : "")">
-                <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(Page - 1)">Anterior</a>
-            </li>
-            @for (int i = 1; i <= TotalPages; i++)
-            {
-                <li class="page-item @(i == Page ? "active" : "")">
-                    <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(i)">@i</a>
-                </li>
-            }
-            <li class="page-item @(Page >= TotalPages ? "disabled" : "")">
-                <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(Page + 1)">Siguiente</a>
-            </li>
-        </ul>
-    </nav>
+    <Pagination Page="@Page" TotalPages="@TotalPages" OnPageChanged="GoToPage" />
 }
 
 @* ───── Modal: Crear / Editar Deuda ───── *@
-@if (ShowFormModal)
-{
-    <div class="modal-overlay" @onclick:stopPropagation @onclick="CloseForm">
-        <div class="modal-card" @onclick:stopPropagation>
-            <h5 class="mb-3">@(EditingDebt == null ? "Nueva Deuda" : "Editar Deuda")</h5>
-
-            <div class="mb-2">
-                <label class="form-label">Nombre</label>
-                <input @bind="FormName" class="form-control" />
-            </div>
-            <div class="row">
-                <div class="col mb-2">
-                    <label class="form-label">Monto original</label>
-                    <input type="number" step="0.01" @bind="FormOriginalAmount" class="form-control" />
-                </div>
-                <div class="col mb-2">
-                    <label class="form-label">Saldo actual</label>
-                    <input type="number" step="0.01" @bind="FormCurrentBalance" class="form-control" />
-                </div>
-            </div>
-            <div class="row">
-                <div class="col mb-2">
-                    <label class="form-label">Tasa de interés %</label>
-                    <input type="number" step="0.01" @bind="FormInterestRate" class="form-control" />
-                </div>
-                <div class="col mb-2">
-                    <label class="form-label">Pago mensual</label>
-                    <input type="number" step="0.01" @bind="FormMonthlyPayment" class="form-control" />
-                </div>
-            </div>
-            <div class="row">
-                <div class="col mb-3">
-                    <label class="form-label">Fecha de inicio</label>
-                    <input type="date" @bind="FormStartDate" class="form-control" />
-                </div>
-                <div class="col mb-3">
-                    <label class="form-label">Fecha de vencimiento</label>
-                    <input type="date" @bind="FormDueDate" class="form-control" />
-                </div>
-            </div>
-
-            @if (!string.IsNullOrEmpty(FormError))
-            {
-                <div class="alert alert-danger py-2 small">@FormError</div>
-            }
-
-            <div class="d-flex gap-2 justify-content-end">
-                <button class="btn btn-secondary" @onclick="CloseForm">Cancelar</button>
-                <button class="btn btn-primary" @onclick="SaveDebtAsync" disabled="@FormLoading">
-                    @if (FormLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
-                    }
-                    Guardar
-                </button>
-            </div>
+<ModalDialog IsVisible="ShowFormModal" Title="@(EditingDebt == null ? "Nueva Deuda" : "Editar Deuda")" OnClose="CloseForm">
+    <div class="mb-2">
+        <label class="form-label">Nombre</label>
+        <input @bind="FormName" class="form-control" />
+    </div>
+    <div class="row">
+        <div class="col mb-2">
+            <label class="form-label">Monto original</label>
+            <input type="number" step="0.01" @bind="FormOriginalAmount" class="form-control" />
+        </div>
+        <div class="col mb-2">
+            <label class="form-label">Saldo actual</label>
+            <input type="number" step="0.01" @bind="FormCurrentBalance" class="form-control" />
         </div>
     </div>
-}
+    <div class="row">
+        <div class="col mb-2">
+            <label class="form-label">Tasa de interés %</label>
+            <input type="number" step="0.01" @bind="FormInterestRate" class="form-control" />
+        </div>
+        <div class="col mb-2">
+            <label class="form-label">Pago mensual</label>
+            <input type="number" step="0.01" @bind="FormMonthlyPayment" class="form-control" />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col mb-3">
+            <label class="form-label">Fecha de inicio</label>
+            <input type="date" @bind="FormStartDate" class="form-control" />
+        </div>
+        <div class="col mb-3">
+            <label class="form-label">Fecha de vencimiento</label>
+            <input type="date" @bind="FormDueDate" class="form-control" />
+        </div>
+    </div>
+
+    <AlertMessage Message="@FormError" Class="py-2 small" />
+
+    <div class="d-flex gap-2 justify-content-end mt-3">
+        <button class="btn btn-secondary" @onclick="CloseForm">Cancelar</button>
+        <SubmitButton Loading="@FormLoading" Label="Guardar" OnClick="SaveDebtAsync" />
+    </div>
+</ModalDialog>
 
 @* ───── Modal: Confirmar Eliminación ───── *@
-@if (ShowDeleteModal && DeletingDebt != null)
-{
-    <div class="modal-overlay" @onclick="CloseDelete">
-        <div class="modal-card" @onclick:stopPropagation style="max-width:400px">
-            <h5 class="mb-3">Eliminar Deuda</h5>
-            <p>¿Estás seguro de eliminar <strong>@DeletingDebt.Name</strong>?</p>
-            <p class="text-muted small">Se eliminarán también todos los pagos asociados.</p>
+<ModalDialog IsVisible="ShowDeleteModal && DeletingDebt != null" Title="Eliminar Deuda" OnClose="CloseDelete" MaxWidth="400px">
+    <p>¿Estás seguro de eliminar <strong>@DeletingDebt?.Name</strong>?</p>
+    <p class="text-muted small">Se eliminarán también todos los pagos asociados.</p>
 
-            <div class="d-flex gap-2 justify-content-end">
-                <button class="btn btn-secondary" @onclick="CloseDelete">Cancelar</button>
-                <button class="btn btn-danger" @onclick="ConfirmDeleteAsync" disabled="@FormLoading">
-                    @if (FormLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
-                    }
-                    Eliminar
-                </button>
-            </div>
-        </div>
+    <div class="d-flex gap-2 justify-content-end mt-3">
+        <button class="btn btn-secondary" @onclick="CloseDelete">Cancelar</button>
+        <SubmitButton Loading="@FormLoading" Label="Eliminar" OnClick="ConfirmDeleteAsync" Class="btn btn-danger" />
     </div>
-}
+</ModalDialog>
 
 @* ───── Modal: Pagar Deuda ───── *@
-@if (ShowPayModal && PayingDebt != null)
-{
-    <div class="modal-overlay" @onclick="ClosePay">
-        <div class="modal-card" @onclick:stopPropagation style="max-width:420px">
-            <h5 class="mb-3">Pagar Deuda</h5>
-            <p><strong>@PayingDebt.Name</strong> — Saldo: @FormatMoney(PayingDebt.CurrentBalance)</p>
+<ModalDialog IsVisible="ShowPayModal && PayingDebt != null" Title="Pagar Deuda" OnClose="ClosePay" MaxWidth="420px">
+    <p><strong>@PayingDebt?.Name</strong> — Saldo: @FormattingHelpers.FormatMoney(PayingDebt?.CurrentBalance ?? 0)</p>
 
-            <div class="mb-3">
-                <label class="form-label">Monto a pagar</label>
-                <input type="number" step="0.01" @bind="PayAmount" class="form-control" />
-            </div>
-
-            @if (!string.IsNullOrEmpty(FormError))
-            {
-                <div class="alert alert-danger py-2 small">@FormError</div>
-            }
-
-            <div class="d-flex gap-2 justify-content-end">
-                <button class="btn btn-secondary" @onclick="ClosePay">Cancelar</button>
-                <button class="btn btn-success" @onclick="ConfirmPayAsync" disabled="@FormLoading">
-                    @if (FormLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
-                    }
-                    Pagar
-                </button>
-            </div>
-        </div>
+    <div class="mb-3">
+        <label class="form-label">Monto a pagar</label>
+        <input type="number" step="0.01" @bind="PayAmount" class="form-control" />
     </div>
-}
+
+    <AlertMessage Message="@FormError" Class="py-2 small" />
+
+    <div class="d-flex gap-2 justify-content-end mt-3">
+        <button class="btn btn-secondary" @onclick="ClosePay">Cancelar</button>
+        <SubmitButton Loading="@FormLoading" Label="Pagar" OnClick="ConfirmPayAsync" Class="btn btn-success" />
+    </div>
+</ModalDialog>
 
 @code {
     private List<Debt> DebtList = new();
@@ -254,19 +189,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthState.GetAuthenticationStateAsync();
-        if (!auth.User.Identity?.IsAuthenticated ?? true)
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
-
-        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(uid, out UserId))
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
+        var userId = await AuthHelper.GetUserIdOrRedirect(AuthState, Nav);
+        if (userId == null) return;
+        UserId = userId.Value;
 
         await LoadDebtListAsync();
     }
@@ -483,7 +408,4 @@ else
     }
 
     private static bool IsOverdue(Debt d) => d.DueDate < DateTime.Today && d.CurrentBalance > 0;
-
-    private static string FormatMoney(decimal val) =>
-        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
 }

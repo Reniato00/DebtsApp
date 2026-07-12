@@ -39,9 +39,7 @@
 
         @if (StrategyLoading)
         {
-            <div class="d-flex justify-content-center py-3">
-                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-            </div>
+            <LoadingSpinner />
         }
         else if (StrategyResult != null)
         {
@@ -94,8 +92,8 @@
                                 <tr>
                                     <td>@s.Month</td>
                                     <td>@s.DebtName</td>
-                                    <td>@FormatMoney(s.PaymentAmount)</td>
-                                    <td>@FormatMoney(s.RemainingBalance)</td>
+                                    <td>@FormattingHelpers.FormatMoney(s.PaymentAmount)</td>
+                                    <td>@FormattingHelpers.FormatMoney(s.RemainingBalance)</td>
                                 </tr>
                             }
                         </tbody>
@@ -115,9 +113,7 @@ else if (ActiveTab == "daily")
 
         @if (DailyLoading)
         {
-            <div class="d-flex justify-content-center py-3">
-                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-            </div>
+            <LoadingSpinner />
         }
         else if (DailyResult != null)
         {
@@ -142,23 +138,23 @@ else if (ActiveTab == "daily")
                             {
                                 <tr>
                                     <td>@item.DebtName</td>
-                                    <td>@FormatMoney(item.CurrentBalance)</td>
+                                    <td>@FormattingHelpers.FormatMoney(item.CurrentBalance)</td>
                                     <td>@item.InterestRate.ToString("N1")%</td>
-                                    <td class="negative">@FormatMoney(item.DailyInterest)</td>
+                                    <td class="negative">@FormattingHelpers.FormatMoney(item.DailyInterest)</td>
                                 </tr>
                             }
                         </tbody>
                         <tfoot class="table-light fw-bold">
                             <tr>
                                 <td colspan="3">Total interés diario</td>
-                                <td class="negative">@FormatMoney(DailyResult.TotalDailyInterest)</td>
+                                <td class="negative">@FormattingHelpers.FormatMoney(DailyResult.TotalDailyInterest)</td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
                 <p class="text-muted small">
-                    Interés mensual estimado: <strong>@FormatMoney(DailyResult.TotalDailyInterest * 30)</strong>
-                    &nbsp;|&nbsp; Anual: <strong>@FormatMoney(DailyResult.TotalDailyInterest * 365)</strong>
+                    Interés mensual estimado: <strong>@FormattingHelpers.FormatMoney(DailyResult.TotalDailyInterest * 30)</strong>
+                    &nbsp;|&nbsp; Anual: <strong>@FormattingHelpers.FormatMoney(DailyResult.TotalDailyInterest * 365)</strong>
                 </p>
             }
         }
@@ -178,7 +174,7 @@ else if (ActiveTab == "prepayment")
                     <option value="">Seleccionar...</option>
                     @foreach (var d in DebtList)
                     {
-                        <option value="@d.Id">@d.Name — @FormatMoney(d.CurrentBalance)</option>
+                        <option value="@d.Id">@d.Name — @FormattingHelpers.FormatMoney(d.CurrentBalance)</option>
                     }
                 </select>
             </div>
@@ -191,9 +187,7 @@ else if (ActiveTab == "prepayment")
 
         @if (PrepaymentLoading)
         {
-            <div class="d-flex justify-content-center py-3">
-                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-            </div>
+            <LoadingSpinner />
         }
         else if (PrepaymentResult != null)
         {
@@ -206,10 +200,10 @@ else if (ActiveTab == "prepayment")
                             <h6 class="card-title">Situación actual</h6>
                             <hr />
                             <p class="mb-1"><strong>@r.DebtName</strong></p>
-                            <p class="mb-1">Saldo: @FormatMoney(r.CurrentBalance)</p>
-                            <p class="mb-1">Pago mensual: @FormatMoney(r.CurrentMonthlyPayment)</p>
+                            <p class="mb-1">Saldo: @FormattingHelpers.FormatMoney(r.CurrentBalance)</p>
+                            <p class="mb-1">Pago mensual: @FormattingHelpers.FormatMoney(r.CurrentMonthlyPayment)</p>
                             <p class="mb-1">Meses restantes: <strong>@r.CurrentRemainingMonths</strong></p>
-                            <p class="mb-0">Interés total: <span class="negative">@FormatMoney(r.CurrentTotalInterest)</span></p>
+                            <p class="mb-0">Interés total: <span class="negative">@FormattingHelpers.FormatMoney(r.CurrentTotalInterest)</span></p>
                         </div>
                     </div>
                 </div>
@@ -221,16 +215,16 @@ else if (ActiveTab == "prepayment")
                             <h6 class="card-title text-success">Reducir plazo</h6>
                             <p class="text-muted small">Misma mensualidad, menos meses.</p>
                             <hr />
-                            <p class="mb-1">Pago mensual: @FormatMoney(r.ReduceTerm.NewMonthlyPayment)</p>
+                            <p class="mb-1">Pago mensual: @FormattingHelpers.FormatMoney(r.ReduceTerm.NewMonthlyPayment)</p>
                             <p class="mb-1">Meses restantes: <strong>@r.ReduceTerm.RemainingMonths</strong></p>
                             @if (r.ReduceTerm.MonthsSaved > 0)
                             {
                                 <p class="mb-1 text-success">Te ahorras <strong>@r.ReduceTerm.MonthsSaved meses</strong></p>
                             }
-                            <p class="mb-1">Interés total: <span class="negative">@FormatMoney(r.ReduceTerm.TotalInterest)</span></p>
+                            <p class="mb-1">Interés total: <span class="negative">@FormattingHelpers.FormatMoney(r.ReduceTerm.TotalInterest)</span></p>
                             @if (r.ReduceTerm.InterestSaved > 0)
                             {
-                                <p class="mb-0 text-success">Ahorras @FormatMoney(r.ReduceTerm.InterestSaved) en intereses</p>
+                                <p class="mb-0 text-success">Ahorras @FormattingHelpers.FormatMoney(r.ReduceTerm.InterestSaved) en intereses</p>
                             }
                             @if (r.ReduceTerm.PayoffDate.HasValue)
                             {
@@ -247,17 +241,17 @@ else if (ActiveTab == "prepayment")
                             <h6 class="card-title text-info">Reducir cuota</h6>
                             <p class="text-muted small">Mismo plazo, menos pago mensual.</p>
                             <hr />
-                            <p class="mb-1">Nuevo pago: @FormatMoney(r.ReducePayment.NewMonthlyPayment)</p>
+                            <p class="mb-1">Nuevo pago: @FormattingHelpers.FormatMoney(r.ReducePayment.NewMonthlyPayment)</p>
                             @if (r.CurrentMonthlyPayment > 0)
                             {
                                 var savedPerMonth = r.CurrentMonthlyPayment - r.ReducePayment.NewMonthlyPayment;
-                                <p class="mb-1 text-info">Pagas @FormatMoney(savedPerMonth) menos al mes</p>
+                                <p class="mb-1 text-info">Pagas @FormattingHelpers.FormatMoney(savedPerMonth) menos al mes</p>
                             }
                             <p class="mb-1">Meses restantes: <strong>@r.ReducePayment.RemainingMonths</strong></p>
-                            <p class="mb-1">Interés total: <span class="negative">@FormatMoney(r.ReducePayment.TotalInterest)</span></p>
+                            <p class="mb-1">Interés total: <span class="negative">@FormattingHelpers.FormatMoney(r.ReducePayment.TotalInterest)</span></p>
                             @if (r.ReducePayment.InterestSaved > 0)
                             {
-                                <p class="mb-0 text-success">Ahorras @FormatMoney(r.ReducePayment.InterestSaved) en intereses</p>
+                                <p class="mb-0 text-success">Ahorras @FormattingHelpers.FormatMoney(r.ReducePayment.InterestSaved) en intereses</p>
                             }
                             @if (r.ReducePayment.PayoffDate.HasValue)
                             {
@@ -271,10 +265,7 @@ else if (ActiveTab == "prepayment")
     </div>
 }
 
-@if (!string.IsNullOrEmpty(ErrorMessage))
-{
-    <div class="alert alert-danger mt-3">@ErrorMessage</div>
-}
+<AlertMessage Message="@ErrorMessage" Class="mt-3" />
 
 @code {
     private string ActiveTab = "strategy";
@@ -311,19 +302,9 @@ else if (ActiveTab == "prepayment")
 
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthState.GetAuthenticationStateAsync();
-        if (!auth.User.Identity?.IsAuthenticated ?? true)
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
-
-        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(uid, out UserId))
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
+        var userId = await AuthHelper.GetUserIdOrRedirect(AuthState, Nav);
+        if (userId == null) return;
+        UserId = userId.Value;
 
         await LoadDailyAsync();
     }
@@ -412,7 +393,4 @@ else if (ActiveTab == "prepayment")
             PrepaymentLoading = false;
         }
     }
-
-    private static string FormatMoney(decimal val) =>
-        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
 }

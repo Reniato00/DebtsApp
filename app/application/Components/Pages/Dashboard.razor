@@ -1,6 +1,7 @@
 @page "/"
 @page "/dashboard"
 @using persistence.Models
+@using application.Models
 @inject services.Services.IDashboardService DashboardSvc
 @inject services.Services.IPaymentService PaymentService
 @inject NavigationManager Nav
@@ -12,11 +13,7 @@
 
 @if (Summary == null)
 {
-    <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Cargando...</span>
-        </div>
-    </div>
+    <LoadingSpinner FullPage="true" />
 }
 else
 {
@@ -27,11 +24,11 @@ else
         </div>
         <div class="stat-card">
             <div class="stat-label">Saldo total</div>
-            <div class="stat-value negative">@FormatMoney(Summary.TotalAmount)</div>
+            <div class="stat-value negative">@FormattingHelpers.FormatMoney(Summary.TotalAmount)</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Pago mensual total</div>
-            <div class="stat-value negative">@FormatMoney(Summary.TotalMonthlyPayment)</div>
+            <div class="stat-value negative">@FormattingHelpers.FormatMoney(Summary.TotalMonthlyPayment)</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Tasa de interés promedio</div>
@@ -46,7 +43,7 @@ else
                 <h5 class="section-title">Próximos pagos</h5>
                 @if (Upcoming == null)
                 {
-                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                    <LoadingSpinner />
                 }
                 else if (Upcoming.Count == 0)
                 {
@@ -69,7 +66,7 @@ else
                                 {
                                     <tr class="@(p.DaysUntilDue <= 7 ? "table-warning" : "")">
                                         <td>@p.DebtName</td>
-                                        <td>@FormatMoney(p.Amount)</td>
+                                        <td>@FormattingHelpers.FormatMoney(p.Amount)</td>
                                         <td>@p.DueDate.ToShortDateString()</td>
                                         <td>@p.DaysUntilDue días</td>
                                     </tr>
@@ -87,7 +84,7 @@ else
                 <h5 class="section-title">Últimos pagos</h5>
                 @if (History == null)
                 {
-                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                    <LoadingSpinner />
                 }
                 else if (History.Count == 0)
                 {
@@ -109,7 +106,7 @@ else
                                 {
                                     <tr>
                                         <td>@p.DebtName</td>
-                                        <td class="negative">@FormatMoney(p.Amount)</td>
+                                        <td class="negative">@FormattingHelpers.FormatMoney(p.Amount)</td>
                                         <td>@p.PaymentDate.ToShortDateString()</td>
                                     </tr>
                                 }
@@ -126,18 +123,18 @@ else
                 <h5 class="section-title">Pagado vs Pendiente</h5>
                 @if (PaidVsPending == null)
                 {
-                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                    <LoadingSpinner />
                 }
                 else
                 {
                     <div class="d-flex gap-4">
                         <div>
                             <div class="stat-label">Pagado</div>
-                            <div class="stat-value positive" style="font-size:1.4rem">@FormatMoney(PaidVsPending.TotalPaid)</div>
+                            <div class="stat-value positive" style="font-size:1.4rem">@FormattingHelpers.FormatMoney(PaidVsPending.TotalPaid)</div>
                         </div>
                         <div>
                             <div class="stat-label">Pendiente</div>
-                            <div class="stat-value negative" style="font-size:1.4rem">@FormatMoney(PaidVsPending.TotalPending)</div>
+                            <div class="stat-value negative" style="font-size:1.4rem">@FormattingHelpers.FormatMoney(PaidVsPending.TotalPending)</div>
                         </div>
                     </div>
                     <div class="progress mt-2" style="height:8px">
@@ -155,7 +152,7 @@ else
                 <h5 class="section-title">Costo de intereses</h5>
                 @if (InterestCost == null)
                 {
-                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                    <LoadingSpinner />
                 }
                 else if (InterestCost.Count == 0)
                 {
@@ -177,8 +174,8 @@ else
                                 {
                                     <tr>
                                         <td>@c.Name</td>
-                                        <td>@FormatMoney(c.TotalInterestPaid)</td>
-                                        <td class="negative">@FormatMoney(c.RemainingInterest)</td>
+                                        <td>@FormattingHelpers.FormatMoney(c.TotalInterestPaid)</td>
+                                        <td class="negative">@FormattingHelpers.FormatMoney(c.RemainingInterest)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -201,19 +198,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthState.GetAuthenticationStateAsync();
-        if (!auth.User.Identity?.IsAuthenticated ?? true)
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
-
-        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(uid, out UserId))
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
+        var userId = await AuthHelper.GetUserIdOrRedirect(AuthState, Nav);
+        if (userId == null) return;
+        UserId = userId.Value;
 
         try { Summary = await DashboardSvc.GetDebtSummaryAsync(UserId); } catch { Summary = new(); }
         try
@@ -263,24 +250,5 @@ else
             var total = PaidVsPending.TotalPaid + PaidVsPending.TotalPending;
             return total > 0 ? Math.Round(PaidVsPending.TotalPaid / total * 100) : 0;
         }
-    }
-
-    private static string FormatMoney(decimal val) =>
-        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
-
-    private class UpcomingPaymentItem
-    {
-        public Guid DebtId { get; set; }
-        public string DebtName { get; set; } = "";
-        public decimal Amount { get; set; }
-        public DateTime DueDate { get; set; }
-        public int DaysUntilDue { get; set; }
-    }
-
-    private class DebtInterestItem
-    {
-        public string Name { get; set; } = "";
-        public decimal TotalInterestPaid { get; set; }
-        public decimal RemainingInterest { get; set; }
     }
 }

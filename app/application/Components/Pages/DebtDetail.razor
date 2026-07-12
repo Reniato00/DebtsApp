@@ -11,18 +11,11 @@
 
 @if (Loading)
 {
-    <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Cargando...</span>
-        </div>
-    </div>
+    <LoadingSpinner FullPage="true" />
 }
 else if (Debt == null)
 {
-    <div class="text-center py-5 text-muted">
-        <p>Deuda no encontrada.</p>
-        <a href="/debts" class="btn btn-outline-primary">Volver a mis deudas</a>
-    </div>
+    <EmptyState Message="Deuda no encontrada." ActionLabel="Volver a mis deudas" OnAction="GoBack" />
 }
 else
 {
@@ -43,12 +36,12 @@ else
                     <hr />
                     <div class="row">
                         <div class="col-md-6">
-                            <p class="mb-1"><strong>Monto original:</strong> @FormatMoney(Debt.OriginalAmount)</p>
-                            <p class="mb-1"><strong>Saldo actual:</strong> <span class="negative">@FormatMoney(Debt.CurrentBalance)</span></p>
+                            <p class="mb-1"><strong>Monto original:</strong> @FormattingHelpers.FormatMoney(Debt.OriginalAmount)</p>
+                            <p class="mb-1"><strong>Saldo actual:</strong> <span class="negative">@FormattingHelpers.FormatMoney(Debt.CurrentBalance)</span></p>
                             <p class="mb-1"><strong>Tasa de interés:</strong> @Debt.InterestRate.ToString("N1")%</p>
                         </div>
                         <div class="col-md-6">
-                            <p class="mb-1"><strong>Pago mensual:</strong> @FormatMoney(Debt.MonthlyPayment)</p>
+                            <p class="mb-1"><strong>Pago mensual:</strong> @FormattingHelpers.FormatMoney(Debt.MonthlyPayment)</p>
                             <p class="mb-1"><strong>Inicio:</strong> @Debt.StartDate.ToShortDateString()</p>
                             <p class="mb-1">
                                 <strong>Vencimiento:</strong> @Debt.DueDate.ToShortDateString()
@@ -64,7 +57,7 @@ else
                         var pctPaid = Debt.OriginalAmount > 0
                             ? Math.Round((Debt.OriginalAmount - Debt.CurrentBalance) / Debt.OriginalAmount * 100, 1)
                             : 0m;
-                        var pctClass = pctPaid >= 100 ? "bg-success" : pctPaid >= 50 ? "bg-primary" : "bg-warning";
+                        var pctClass = FormattingHelpers.ProgressClass(pctPaid);
                     }
                     <div class="mt-3">
                         <div class="d-flex justify-content-between small mb-1">
@@ -87,13 +80,13 @@ else
                         <div class="col-md-4">
                             <div class="border rounded p-2 text-center">
                                 <small class="text-muted d-block">Interés diario</small>
-                                <strong class="negative">@FormatMoney(dailyRate)</strong>
+                                <strong class="negative">@FormattingHelpers.FormatMoney(dailyRate)</strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-2 text-center">
                                 <small class="text-muted d-block">Interés mensual</small>
-                                <strong class="negative">@FormatMoney(monthlyInterest)</strong>
+                                <strong class="negative">@FormattingHelpers.FormatMoney(monthlyInterest)</strong>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -137,21 +130,9 @@ else
                         <input class="form-check-input" type="checkbox" @bind="QuickWasOnTime" id="qWasOnTime" />
                         <label class="form-check-label small" for="qWasOnTime">A tiempo</label>
                     </div>
-                    @if (!string.IsNullOrEmpty(QuickError))
-                    {
-                        <div class="alert alert-danger py-1 small">@QuickError</div>
-                    }
-                    @if (!string.IsNullOrEmpty(QuickSuccess))
-                    {
-                        <div class="alert alert-success py-1 small">@QuickSuccess</div>
-                    }
-                    <button class="btn btn-success btn-sm w-100" @onclick="QuickPayAsync" disabled="@QuickLoading">
-                        @if (QuickLoading)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                        }
-                        Pagar @FormatMoney(QuickAmount > 0 ? QuickAmount : Debt.MonthlyPayment)
-                    </button>
+                    <AlertMessage Message="@QuickError" Class="py-1 small" />
+                    <AlertMessage Message="@QuickSuccess" Type="success" Class="py-1 small" />
+                    <SubmitButton Loading="@QuickLoading" Label="@QuickPayLabel" OnClick="QuickPayAsync" Class="btn btn-success btn-sm w-100" />
                 </div>
             </div>
         </div>
@@ -178,7 +159,7 @@ else
                     <div class="border rounded p-2">
                         <small class="text-muted d-block">Situación actual</small>
                         <strong>@r.CurrentRemainingMonths meses</strong>
-                        <small class="d-block text-muted">@FormatMoney(r.CurrentTotalInterest) en intereses</small>
+                        <small class="d-block text-muted">@FormattingHelpers.FormatMoney(r.CurrentTotalInterest) en intereses</small>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -191,17 +172,17 @@ else
                         }
                         @if (r.ReduceTerm.InterestSaved > 0)
                         {
-                            <small class="d-block text-success">Ahorras @FormatMoney(r.ReduceTerm.InterestSaved)</small>
+                            <small class="d-block text-success">Ahorras @FormattingHelpers.FormatMoney(r.ReduceTerm.InterestSaved)</small>
                         }
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="border rounded p-2 border-info">
                         <small class="text-info d-block">Reducir cuota</small>
-                        <strong>@FormatMoney(r.ReducePayment.NewMonthlyPayment)/mes</strong>
+                        <strong>@FormattingHelpers.FormatMoney(r.ReducePayment.NewMonthlyPayment)/mes</strong>
                         @if (r.ReducePayment.InterestSaved > 0)
                         {
-                            <small class="d-block text-info">Ahorras @FormatMoney(r.ReducePayment.InterestSaved)</small>
+                            <small class="d-block text-info">Ahorras @FormattingHelpers.FormatMoney(r.ReducePayment.InterestSaved)</small>
                         }
                     </div>
                 </div>
@@ -209,7 +190,7 @@ else
         }
         else if (!string.IsNullOrEmpty(PrepError))
         {
-            <div class="alert alert-warning py-1 small mt-2">@PrepError</div>
+            <AlertMessage Message="@PrepError" Type="warning" Class="py-1 small mt-2" />
         }
     </div>
 
@@ -219,9 +200,7 @@ else
         <hr />
         @if (PaymentsLoading)
         {
-            <div class="d-flex justify-content-center py-3">
-                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-            </div>
+            <LoadingSpinner />
         }
         else if (Payments.Count == 0)
         {
@@ -245,17 +224,17 @@ else
                         {
                             <tr>
                                 <td>@p.PaymentDate.ToString("dd/MM/yyyy")</td>
-                                <td class="negative">@FormatMoney(p.Amount)</td>
-                                <td>@TipoLabel(p.PaymentType)</td>
-                                <td>@(p.WasOnTime ? "Sí" : "No")</td>
-                                <td>@EffectLabel(p.PrepaymentEffect)</td>
+                                <td class="negative">@FormattingHelpers.FormatMoney(p.Amount)</td>
+                                <td>@FormattingHelpers.TipoLabel(p.PaymentType)</td>
+                                <td>@FormattingHelpers.OnTimeLabel(p.WasOnTime)</td>
+                                <td>@FormattingHelpers.EffectLabel(p.PrepaymentEffect)</td>
                             </tr>
                         }
                     </tbody>
                     <tfoot class="table-light fw-bold">
                         <tr>
                             <td>Total</td>
-                            <td class="negative">@FormatMoney(Payments.Sum(p => p.Amount))</td>
+                            <td class="negative">@FormattingHelpers.FormatMoney(Payments.Sum(p => p.Amount))</td>
                             <td colspan="3"></td>
                         </tr>
                     </tfoot>
@@ -292,6 +271,11 @@ else
 
     private bool IsOverdue => Debt != null && Debt.DueDate < DateTime.Today && Debt.CurrentBalance > 0;
 
+    private string QuickPayLabel =>
+        "Pagar " + FormattingHelpers.FormatMoney(QuickAmount > 0 ? QuickAmount : Debt?.MonthlyPayment ?? 0);
+
+    private void GoBack() => Nav.NavigateTo("/debts");
+
     private int EstimatedMonths
     {
         get
@@ -309,19 +293,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthState.GetAuthenticationStateAsync();
-        if (!auth.User.Identity?.IsAuthenticated ?? true)
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
-
-        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(uid, out UserId))
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
+        var userId = await AuthHelper.GetUserIdOrRedirect(AuthState, Nav);
+        if (userId == null) return;
+        UserId = userId.Value;
 
         await LoadAsync();
     }
@@ -379,7 +353,7 @@ else
                 DebtId, amount, QuickPaymentType, QuickWasOnTime,
                 QuickPaymentType == "prepayment" ? QuickPrepaymentEffect : null,
                 idempotencyKey);
-            QuickSuccess = $"Pago de {FormatMoney(amount)} registrado.";
+            QuickSuccess = $"Pago de {FormattingHelpers.FormatMoney(amount)} registrado.";
             QuickAmount = 0;
             await LoadAsync();
         }
@@ -440,13 +414,8 @@ else
         sb.AppendLine("Fecha,Monto,Tipo,A Tiempo,Efecto");
         foreach (var p in Payments)
         {
-            var tipo = p.PaymentType == "prepayment" ? "Prepago" : "Cotidiano";
-            var effect = p.PrepaymentEffect switch
-            {
-                "reduceTerm" => "Reducir plazo",
-                "reducePayment" => "Reducir cuota",
-                _ => ""
-            };
+            var tipo = FormattingHelpers.TipoLabel(p.PaymentType);
+            var effect = FormattingHelpers.EffectLabel(p.PrepaymentEffect);
             sb.AppendLine($"{p.PaymentDate:yyyy-MM-dd},{p.Amount},{tipo},{(p.WasOnTime ? "Sí" : "No")},{effect}");
         }
         sb.AppendLine();
@@ -456,20 +425,4 @@ else
         var base64 = Convert.ToBase64String(bytes);
         await JS.InvokeVoidAsync("downloadFile", $"deuda_{Debt.Name}_{DateTime.Now:yyyyMMdd}.csv", base64);
     }
-
-    private static string TipoLabel(string t) => t switch
-    {
-        "prepayment" => "Prepago",
-        _ => "Cotidiano"
-    };
-
-    private static string EffectLabel(string? e) => e switch
-    {
-        "reduceTerm" => "Reducir plazo",
-        "reducePayment" => "Reducir cuota",
-        _ => "—"
-    };
-
-    private static string FormatMoney(decimal val) =>
-        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
 }

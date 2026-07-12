@@ -1,0 +1,31 @@
+@if (TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination pagination-sm justify-content-center">
+            <li class="page-item @(Page <= 1 ? "disabled" : "")">
+                <a class="page-link" href="javascript:void(0)" @onclick="() => GoTo(Page - 1)">Anterior</a>
+            </li>
+            @for (int i = 1; i <= TotalPages; i++)
+            {
+                <li class="page-item @(i == Page ? "active" : "")">
+                    <a class="page-link" href="javascript:void(0)" @onclick="() => GoTo(i)">@i</a>
+                </li>
+            }
+            <li class="page-item @(Page >= TotalPages ? "disabled" : "")">
+                <a class="page-link" href="javascript:void(0)" @onclick="() => GoTo(Page + 1)">Siguiente</a>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    [Parameter] public int Page { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    private async Task GoTo(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        await OnPageChanged.InvokeAsync(page);
+    }
+}
