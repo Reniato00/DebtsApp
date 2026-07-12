@@ -26,6 +26,21 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; " +
+        "font-src 'self'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'; " +
+        "connect-src 'self' ws:;";
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseAntiforgery();
 

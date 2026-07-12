@@ -231,11 +231,13 @@ else
         }
 
         FormLoading = true;
+        var idempotencyKey = $"payment:{UserId}:{Guid.NewGuid():n}";
         try
         {
             await PaymentService.CreatePaymentAsync(
                 FormDebtId.Value, FormAmount, FormPaymentType, FormWasOnTime,
-                FormPaymentType == "prepayment" ? FormPrepaymentEffect : null);
+                FormPaymentType == "prepayment" ? FormPrepaymentEffect : null,
+                idempotencyKey);
             SuccessMessage = "Pago registrado correctamente.";
             await LoadDebtsAsync();
             FormDebtId = null;
