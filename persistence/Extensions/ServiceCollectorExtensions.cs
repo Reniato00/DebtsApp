@@ -12,7 +12,7 @@ namespace persistence.Extensions
             services.AddScoped<IDebtRepository, DebtRepository>();
             services.AddScoped<IPaymentRepository, PaymentRepository>();
             services.AddScoped<IUserRepository, UserRepository>();
-            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+
         }
     }
 }

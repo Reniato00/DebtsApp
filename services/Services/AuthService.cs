@@ -1,9 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
+using System.Collections.Concurrent;
 using persistence.Repositories;
 using domain.Entities;
 
@@ -11,39 +6,37 @@ namespace services.Services
 {
     public interface IAuthService
     {
-        Task<(string accessToken, string refreshToken, int expiresIn)> RegisterAsync(string email, string name, string password);
-        Task<(string accessToken, string refreshToken, int expiresIn)> LoginAsync(string email, string password);
-        Task<(string accessToken, string refreshToken, int expiresIn)> RefreshTokenAsync(string refreshToken);
+        Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password);
+        Task<(Guid userId, string name)> LoginAsync(string email, string password);
         Task LogoutAsync(Guid userId);
     }
 
     public class AuthService : IAuthService
     {
-        private readonly IConfiguration configuration;
-        private readonly IRefreshTokenRepository refreshTokenRepo;
         private readonly IUserRepository userRepo;
+        private static readonly ConcurrentDictionary<string, LoginAttempt> _failedAttempts = new();
 
-        public AuthService(IConfiguration configuration, IRefreshTokenRepository refreshTokenRepo, IUserRepository userRepo)
+        private const int MaxAttempts = 5;
+        private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+        public AuthService(IUserRepository userRepo)
         {
-            this.configuration = configuration;
-            this.refreshTokenRepo = refreshTokenRepo;
             this.userRepo = userRepo;
         }
 
-        public async Task<(string accessToken, string refreshToken, int expiresIn)> RegisterAsync(string email, string name, string password)
+        public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password)
         {
             if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentException("Email is required");
+                throw new ArgumentException("El correo es requerido");
 
             if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("Name is required");
+                throw new ArgumentException("El nombre es requerido");
 
-            if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
-                throw new ArgumentException("Password must be at least 6 characters");
+            ValidatePassword(password);
 
             var existing = await userRepo.GetByEmailAsync(email);
             if (existing != null)
-                throw new InvalidOperationException("A user with this email already exists");
+                throw new InvalidOperationException("Ya existe un usuario con este correo");
 
             var user = new User
             {
@@ -55,117 +48,85 @@ namespace services.Services
 
             var created = await userRepo.CreateUserAsync(user);
             if (created == null)
-                throw new Exception("Failed to create user");
+                throw new Exception("Error al crear el usuario");
 
-            return await GenerateTokenPairAsync(created.Id, created.Name);
+            return (created.Id, created.Name);
         }
 
-        public async Task<(string accessToken, string refreshToken, int expiresIn)> LoginAsync(string email, string password)
+        public async Task<(Guid userId, string name)> LoginAsync(string email, string password)
         {
             if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentException("Email is required");
+                throw new ArgumentException("El correo es requerido");
 
             if (string.IsNullOrWhiteSpace(password))
-                throw new ArgumentException("Password is required");
+                throw new ArgumentException("La contraseña es requerida");
+
+            CheckRateLimit(email);
 
             var user = await userRepo.GetByEmailAsync(email);
             if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-                throw new UnauthorizedAccessException("Invalid email or password");
-
-            return await GenerateTokenPairAsync(user.Id, user.Name);
-        }
-
-        public async Task<(string accessToken, string refreshToken, int expiresIn)> RefreshTokenAsync(string refreshToken)
-        {
-            if (string.IsNullOrWhiteSpace(refreshToken))
-                throw new ArgumentException("Refresh token is required");
-
-            var tokenHash = HashToken(refreshToken);
-            var stored = await refreshTokenRepo.GetByTokenHashAsync(tokenHash);
-
-            if (stored == null || stored.IsRevoked || stored.ExpiresAt < DateTime.UtcNow)
-                throw new UnauthorizedAccessException("Invalid or expired refresh token");
-
-            await refreshTokenRepo.RevokeAsync(stored.Id);
-
-            var user = await userRepo.GetByIdAsync(stored.UserId);
-            var name = user?.Name ?? "Unknown";
-
-            return await GenerateTokenPairAsync(stored.UserId, name);
-        }
-
-        public async Task LogoutAsync(Guid userId)
-        {
-            if (userId == Guid.Empty)
-                throw new ArgumentException("UserId is required");
-
-            await refreshTokenRepo.RevokeAllForUserAsync(userId);
-        }
-
-        private string GenerateAccessToken(Guid userId, string name)
-        {
-            var jwtSettings = configuration.GetSection("Jwt");
-            var secret = jwtSettings["Secret"]!;
-            var issuer = jwtSettings["Issuer"]!;
-            var audience = jwtSettings["Audience"]!;
-            var expirationMinutes = int.Parse(jwtSettings["ExpirationMinutes"]!);
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-                new Claim(ClaimTypes.Name, name)
-            };
+                RecordFailedAttempt(email);
+                throw new UnauthorizedAccessException("Correo o contraseña incorrectos");
+            }
 
-            var token = new JwtSecurityToken(
-                issuer: issuer,
-                audience: audience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(expirationMinutes),
-                signingCredentials: credentials
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            _failedAttempts.TryRemove(email, out _);
+            return (user.Id, user.Name);
         }
 
-        private async Task<(string accessToken, string refreshToken, int expiresIn)> GenerateTokenPairAsync(Guid userId, string name)
+        public Task LogoutAsync(Guid userId)
         {
-            var accessToken = GenerateAccessToken(userId, name);
-            var (refreshToken, refreshTokenHash) = GenerateRefreshToken();
+            return Task.CompletedTask;
+        }
 
-            var expiresIn = int.Parse(configuration.GetSection("Jwt")["ExpirationMinutes"]!);
-            var refreshExpirationDays = int.Parse(
-                configuration.GetSection("Jwt")["RefreshTokenExpirationDays"] ?? "7");
+        private static void ValidatePassword(string password)
+        {
+            if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+                throw new ArgumentException("La contraseña debe tener al menos 8 caracteres");
 
-            await refreshTokenRepo.CreateAsync(new RefreshToken
+            if (!password.Any(char.IsUpper))
+                throw new ArgumentException("La contraseña debe contener al menos una mayúscula");
+
+            if (!password.Any(char.IsDigit))
+                throw new ArgumentException("La contraseña debe contener al menos un número");
+        }
+
+        private void CheckRateLimit(string email)
+        {
+            if (_failedAttempts.TryGetValue(email, out var attempt))
             {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                TokenHash = refreshTokenHash,
-                ExpiresAt = DateTime.UtcNow.AddDays(refreshExpirationDays),
-                IsRevoked = false,
-                CreatedAt = DateTime.UtcNow,
-                RevokedAt = null
-            });
-
-            return (accessToken, refreshToken, expiresIn * 60);
+                if (attempt.Count >= MaxAttempts)
+                {
+                    var elapsed = DateTime.UtcNow - attempt.FirstAttempt;
+                    if (elapsed < LockoutDuration)
+                    {
+                        var remaining = (int)(LockoutDuration - elapsed).TotalMinutes;
+                        throw new UnauthorizedAccessException(
+                            $"Demasiados intentos. Intenta de nuevo en {remaining} minuto(s).");
+                    }
+                    _failedAttempts.TryRemove(email, out _);
+                }
+            }
         }
 
-        private static (string raw, string hash) GenerateRefreshToken()
+        private void RecordFailedAttempt(string email)
         {
-            var randomBytes = new byte[64];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(randomBytes);
-            var raw = Convert.ToBase64String(randomBytes);
-            return (raw, HashToken(raw));
+            var now = DateTime.UtcNow;
+            _failedAttempts.AddOrUpdate(email,
+                _ => new LoginAttempt { Count = 1, FirstAttempt = now },
+                (_, existing) =>
+                {
+                    if (now - existing.FirstAttempt > LockoutDuration)
+                        return new LoginAttempt { Count = 1, FirstAttempt = now };
+                    existing.Count++;
+                    return existing;
+                });
         }
 
-        private static string HashToken(string token)
+        private class LoginAttempt
         {
-            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-            return Convert.ToBase64String(bytes);
+            public int Count { get; set; }
+            public DateTime FirstAttempt { get; set; }
         }
     }
 }

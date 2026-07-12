@@ -7,11 +7,22 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 {
     private Guid _userId;
     private string _userName = "";
+    private DateTime _lastActivity = DateTime.MinValue;
+
+    private static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(20);
 
     public override Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         if (_userId == Guid.Empty)
             return Task.FromResult(NotAuthenticated());
+
+        if (DateTime.UtcNow - _lastActivity > SessionTimeout)
+        {
+            SignOut();
+            return Task.FromResult(NotAuthenticated());
+        }
+
+        _lastActivity = DateTime.UtcNow;
 
         var identity = new ClaimsIdentity(new[]
         {
@@ -26,6 +37,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
     {
         _userId = userId;
         _userName = userName;
+        _lastActivity = DateTime.UtcNow;
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
 
@@ -33,6 +45,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
     {
         _userId = Guid.Empty;
         _userName = "";
+        _lastActivity = DateTime.MinValue;
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
 
