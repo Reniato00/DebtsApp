@@ -29,3 +29,32 @@ public class DailyInterestResultDto
     public List<DailyInterestItemDto> Items { get; set; } = new();
     public decimal TotalDailyInterest { get; set; }
 }
+
+public class PrepaymentAnalysisRequestDto
+{
+    public Guid DebtId { get; set; }
+    public decimal ExtraAmount { get; set; }
+}
+
+public class PrepaymentAnalysisResultDto
+{
+    public string DebtName { get; set; } = "";
+    public decimal CurrentBalance { get; set; }
+    public decimal ExtraAmount { get; set; }
+    public decimal NewBalance { get; set; }
+    public decimal CurrentMonthlyPayment { get; set; }
+    public int CurrentRemainingMonths { get; set; }
+    public decimal CurrentTotalInterest { get; set; }
+    public PrepaymentScenarioDto ReduceTerm { get; set; } = new();
+    public PrepaymentScenarioDto ReducePayment { get; set; } = new();
+}
+
+public class PrepaymentScenarioDto
+{
+    public int RemainingMonths { get; set; }
+    public decimal NewMonthlyPayment { get; set; }
+    public decimal TotalInterest { get; set; }
+    public decimal InterestSaved { get; set; }
+    public int MonthsSaved { get; set; }
+    public DateTime? PayoffDate { get; set; }
+}

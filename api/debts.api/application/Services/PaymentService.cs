@@ -8,7 +8,7 @@ namespace application.Services
 {
     public interface IPaymentService
     {
-        Task<Payment> CreatePaymentAsync(Guid debtId, decimal amount);
+        Task<Payment> CreatePaymentAsync(Guid debtId, decimal amount, string paymentType = "regular", bool wasOnTime = true, string? prepaymentEffect = null, string? idempotencyKey = null);
         Task<IEnumerable<Payment>> GetByDebtIdAsync(Guid debtId);
         Task<Payment?> GetByIdAsync(Guid id);
         Task<bool> DeletePaymentAsync(Guid id);
@@ -68,7 +68,7 @@ namespace application.Services
             return debt?.UserId ?? Guid.Empty;
         }
 
-        public async Task<Payment> CreatePaymentAsync(Guid debtId, decimal amount)
+        public async Task<Payment> CreatePaymentAsync(Guid debtId, decimal amount, string paymentType = "regular", bool wasOnTime = true, string? prepaymentEffect = null, string? idempotencyKey = null)
         {
             if (debtId == Guid.Empty)
                 throw new ArgumentException("DebtId is required");
@@ -76,19 +76,52 @@ namespace application.Services
             if (amount <= 0)
                 throw new ArgumentException("Payment amount must be greater than zero");
 
+            var debt = await debtRepository.GetByIdAsync(debtId);
+            if (debt == null)
+                throw new KeyNotFoundException("Debt not found");
+
+            decimal? originalMonthlyPayment = null;
+
+            if (paymentType == "prepayment" && prepaymentEffect == "reducePayment")
+            {
+                originalMonthlyPayment = debt.MonthlyPayment;
+
+                var monthlyRate = debt.InterestRate / 100m / 12m;
+                var newBalance = Math.Max(0, debt.CurrentBalance - amount);
+
+                if (newBalance > 0 && monthlyRate > 0 && debt.DueDate > DateTime.UtcNow)
+                {
+                    var monthsRemaining = (debt.DueDate.Year - DateTime.UtcNow.Year) * 12 +
+                                          (debt.DueDate.Month - DateTime.UtcNow.Month);
+                    if (monthsRemaining > 0)
+                    {
+                        var r = (double)monthlyRate;
+                        var n = (double)monthsRemaining;
+                        var factor = r * Math.Pow(1 + r, n) / (Math.Pow(1 + r, n) - 1);
+                        var newPayment = (decimal)factor * newBalance;
+                        debt.MonthlyPayment = Math.Round(newPayment, 2);
+                        await debtRepository.UpdateDebtAsync(debt);
+                    }
+                }
+            }
+
             var payment = new Payment
             {
                 Id = Guid.NewGuid(),
                 DebtId = debtId,
                 Amount = amount,
-                PaymentDate = DateTime.UtcNow
+                PaymentDate = DateTime.UtcNow,
+                PaymentType = paymentType,
+                WasOnTime = wasOnTime,
+                PrepaymentEffect = paymentType == "prepayment" ? prepaymentEffect : null,
+                OriginalMonthlyPayment = originalMonthlyPayment
             };
 
-            var created = await paymentRepository.CreatePaymentAsync(payment);
+            var created = await paymentRepository.CreatePaymentAsync(payment, idempotencyKey);
 
             if (created != null)
             {
-                var userId = await GetUserIdByDebtIdAsync(debtId);
+                var userId = debt.UserId;
                 InvalidatePaymentCache(debtId, userId);
             }
 

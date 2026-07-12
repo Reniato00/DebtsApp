@@ -6,12 +6,14 @@ namespace application.Models
         public decimal TotalDaily { get; set; }
         public decimal TotalMonthly { get; set; }
         public decimal TotalYearly { get; set; }
+        public decimal TotalDailyInterest { get; set; }
     }
 
     public class DailyInterestItem
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string DebtName { get; set; } = string.Empty;
         public decimal CurrentBalance { get; set; }
         public decimal InterestRate { get; set; }
         public decimal DailyInterest { get; set; }

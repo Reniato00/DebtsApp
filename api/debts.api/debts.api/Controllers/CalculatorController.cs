@@ -1,3 +1,4 @@
+using application.Models;
 using application.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,9 +24,23 @@ namespace debts.api.Controllers
         /// <param name="userId">Id del usuario (header).</param>
         /// <returns>Orden de pago recomendado para cada estrategia.</returns>
         [HttpGet("strategy")]
-        public async Task<IActionResult> GetPayoffStrategy([FromHeader] Guid userId)
+        public async Task<IActionResult> GetPayoffStrategy(
+            [FromHeader] Guid userId,
+            [FromQuery] decimal monthlyPayment = 0)
         {
-            var result = await calculatorService.GetPayoffStrategyAsync(userId);
+            var result = await calculatorService.GetPayoffStrategyAsync(userId, monthlyPayment);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Simula el impacto de un pago extra en una deuda (reducir plazo vs reducir cuota).
+        /// </summary>
+        [HttpPost("prepayment-analysis")]
+        public async Task<IActionResult> AnalyzePrepayment(
+            [FromHeader] Guid userId,
+            [FromBody] PrepaymentAnalysisRequest request)
+        {
+            var result = await calculatorService.AnalyzePrepaymentAsync(userId, request);
             return Ok(result);
         }
 

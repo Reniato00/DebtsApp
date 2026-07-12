@@ -31,7 +31,7 @@ public class PaymentServiceTests
         var userId = Guid.NewGuid();
         var payment = new Payment { Id = Guid.NewGuid(), DebtId = debtId, Amount = 500, PaymentDate = DateTime.UtcNow };
         debtRepoMock.Setup(r => r.GetByIdAsync(debtId)).ReturnsAsync(new Debt { Id = debtId, UserId = userId });
-        paymentRepoMock.Setup(r => r.CreatePaymentAsync(It.IsAny<Payment>())).ReturnsAsync(payment);
+        paymentRepoMock.Setup(r => r.CreatePaymentAsync(It.IsAny<Payment>(), It.IsAny<string?>())).ReturnsAsync(payment);
 
         var result = await service.CreatePaymentAsync(debtId, 500);
 

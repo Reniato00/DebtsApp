@@ -1,0 +1,475 @@
+@page "/debt/{DebtId:guid}"
+@using domain.Entities
+@inject services.Services.IDebtService DebtService
+@inject services.Services.IPaymentService PaymentService
+@inject services.Services.ICalculatorService CalcService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+@inject IJSRuntime JS
+
+<PageTitle>@(Debt?.Name ?? "Deuda")</PageTitle>
+
+@if (Loading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (Debt == null)
+{
+    <div class="text-center py-5 text-muted">
+        <p>Deuda no encontrada.</p>
+        <a href="/debts" class="btn btn-outline-primary">Volver a mis deudas</a>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">@Debt.Name</h3>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsvAsync">Exportar CSV</button>
+            <a href="/debts" class="btn btn-outline-primary btn-sm">Volver</a>
+        </div>
+    </div>
+
+    @* ───── Info General + Progreso ───── *@
+    <div class="row g-3 mb-4">
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Información general</h5>
+                    <hr />
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Monto original:</strong> @FormatMoney(Debt.OriginalAmount)</p>
+                            <p class="mb-1"><strong>Saldo actual:</strong> <span class="negative">@FormatMoney(Debt.CurrentBalance)</span></p>
+                            <p class="mb-1"><strong>Tasa de interés:</strong> @Debt.InterestRate.ToString("N1")%</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Pago mensual:</strong> @FormatMoney(Debt.MonthlyPayment)</p>
+                            <p class="mb-1"><strong>Inicio:</strong> @Debt.StartDate.ToShortDateString()</p>
+                            <p class="mb-1">
+                                <strong>Vencimiento:</strong> @Debt.DueDate.ToShortDateString()
+                                @if (IsOverdue)
+                                {
+                                    <span class="badge bg-danger ms-1">Vencida</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+
+                    @{
+                        var pctPaid = Debt.OriginalAmount > 0
+                            ? Math.Round((Debt.OriginalAmount - Debt.CurrentBalance) / Debt.OriginalAmount * 100, 1)
+                            : 0m;
+                        var pctClass = pctPaid >= 100 ? "bg-success" : pctPaid >= 50 ? "bg-primary" : "bg-warning";
+                    }
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>Progreso de pago</span>
+                            <span>@pctPaid% pagado</span>
+                        </div>
+                        <div class="progress" style="height:10px">
+                            <div class="progress-bar @pctClass" role="progressbar"
+                                 style="width:@(Math.Min(pctPaid, 100))%"
+                                 aria-valuenow="@pctPaid" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    @{
+                        var dailyRate = Debt.CurrentBalance * (Debt.InterestRate / 100m) / 365m;
+                        var monthlyInterest = dailyRate * 30;
+                    }
+                    <div class="row mt-3 g-2">
+                        <div class="col-md-4">
+                            <div class="border rounded p-2 text-center">
+                                <small class="text-muted d-block">Interés diario</small>
+                                <strong class="negative">@FormatMoney(dailyRate)</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-2 text-center">
+                                <small class="text-muted d-block">Interés mensual</small>
+                                <strong class="negative">@FormatMoney(monthlyInterest)</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-2 text-center">
+                                <small class="text-muted d-block">Meses restantes (est.)</small>
+                                <strong>@EstimatedMonths</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            @* ───── Pago Rápido ───── *@
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Registrar pago</h5>
+                    <hr />
+                    <div class="mb-2">
+                        <label class="form-label small">Monto</label>
+                        <input type="number" min="0.01" step="0.01" @bind="QuickAmount" class="form-control form-control-sm" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Tipo</label>
+                        <select @bind="QuickPaymentType" class="form-select form-select-sm">
+                            <option value="regular">Cotidiano</option>
+                            <option value="prepayment">Prepago</option>
+                        </select>
+                    </div>
+                    @if (QuickPaymentType == "prepayment")
+                    {
+                        <div class="mb-2">
+                            <label class="form-label small">Efecto</label>
+                            <select @bind="QuickPrepaymentEffect" class="form-select form-select-sm">
+                                <option value="reduceTerm">Reducir plazo</option>
+                                <option value="reducePayment">Reducir cuota</option>
+                            </select>
+                        </div>
+                    }
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" @bind="QuickWasOnTime" id="qWasOnTime" />
+                        <label class="form-check-label small" for="qWasOnTime">A tiempo</label>
+                    </div>
+                    @if (!string.IsNullOrEmpty(QuickError))
+                    {
+                        <div class="alert alert-danger py-1 small">@QuickError</div>
+                    }
+                    @if (!string.IsNullOrEmpty(QuickSuccess))
+                    {
+                        <div class="alert alert-success py-1 small">@QuickSuccess</div>
+                    }
+                    <button class="btn btn-success btn-sm w-100" @onclick="QuickPayAsync" disabled="@QuickLoading">
+                        @if (QuickLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Pagar @FormatMoney(QuickAmount > 0 ? QuickAmount : Debt.MonthlyPayment)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ───── Mini Calculadora de Prepago ───── *@
+    <div class="card p-3 mb-4">
+        <h5 class="card-title">Simular prepago</h5>
+        <p class="text-muted small mb-2">¿Qué pasa si pagas un monto extra a esta deuda?</p>
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small">Monto extra ($)</label>
+                <input type="number" min="0" step="0.01" @bind="PrepExtraAmount" class="form-control form-control-sm" style="width:180px" />
+            </div>
+            <div class="col-auto d-flex gap-2">
+                <button class="btn btn-outline-info btn-sm" @onclick="SimulatePrepayAsync" disabled="@PrepLoading">Calcular</button>
+            </div>
+        </div>
+        @if (PrepResult != null)
+        {
+            var r = PrepResult;
+            <div class="row g-2 mt-2">
+                <div class="col-md-4">
+                    <div class="border rounded p-2">
+                        <small class="text-muted d-block">Situación actual</small>
+                        <strong>@r.CurrentRemainingMonths meses</strong>
+                        <small class="d-block text-muted">@FormatMoney(r.CurrentTotalInterest) en intereses</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-2 border-success">
+                        <small class="text-success d-block">Reducir plazo</small>
+                        <strong>@r.ReduceTerm.RemainingMonths meses</strong>
+                        @if (r.ReduceTerm.MonthsSaved > 0)
+                        {
+                            <small class="d-block text-success">@r.ReduceTerm.MonthsSaved meses menos</small>
+                        }
+                        @if (r.ReduceTerm.InterestSaved > 0)
+                        {
+                            <small class="d-block text-success">Ahorras @FormatMoney(r.ReduceTerm.InterestSaved)</small>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-2 border-info">
+                        <small class="text-info d-block">Reducir cuota</small>
+                        <strong>@FormatMoney(r.ReducePayment.NewMonthlyPayment)/mes</strong>
+                        @if (r.ReducePayment.InterestSaved > 0)
+                        {
+                            <small class="d-block text-info">Ahorras @FormatMoney(r.ReducePayment.InterestSaved)</small>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(PrepError))
+        {
+            <div class="alert alert-warning py-1 small mt-2">@PrepError</div>
+        }
+    </div>
+
+    @* ───── Historial de Pagos ───── *@
+    <div class="card p-4">
+        <h5 class="card-title">Historial de pagos</h5>
+        <hr />
+        @if (PaymentsLoading)
+        {
+            <div class="d-flex justify-content-center py-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            </div>
+        }
+        else if (Payments.Count == 0)
+        {
+            <p class="text-muted">No hay pagos registrados para esta deuda.</p>
+        }
+        else
+        {
+            <div class="table-responsive" style="max-height:400px; overflow-y:auto">
+                <table class="table table-sm table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Monto</th>
+                            <th>Tipo</th>
+                            <th>A tiempo</th>
+                            <th>Efecto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Payments)
+                        {
+                            <tr>
+                                <td>@p.PaymentDate.ToString("dd/MM/yyyy")</td>
+                                <td class="negative">@FormatMoney(p.Amount)</td>
+                                <td>@TipoLabel(p.PaymentType)</td>
+                                <td>@(p.WasOnTime ? "Sí" : "No")</td>
+                                <td>@EffectLabel(p.PrepaymentEffect)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td>Total</td>
+                            <td class="negative">@FormatMoney(Payments.Sum(p => p.Amount))</td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid DebtId { get; set; }
+
+    private Debt? Debt;
+    private List<Payment> Payments = new();
+    private bool Loading = true;
+    private bool PaymentsLoading;
+
+    // Quick payment
+    private decimal QuickAmount;
+    private string QuickPaymentType = "regular";
+    private bool QuickWasOnTime = true;
+    private string? QuickPrepaymentEffect = "reduceTerm";
+    private bool QuickLoading;
+    private string? QuickError;
+    private string? QuickSuccess;
+
+    // Prep simulation
+    private decimal PrepExtraAmount;
+    private bool PrepLoading;
+    private services.Models.PrepaymentAnalysisResult? PrepResult;
+    private string? PrepError;
+
+    private Guid UserId;
+
+    private bool IsOverdue => Debt != null && Debt.DueDate < DateTime.Today && Debt.CurrentBalance > 0;
+
+    private int EstimatedMonths
+    {
+        get
+        {
+            if (Debt == null || Debt.MonthlyPayment <= 0 || Debt.CurrentBalance <= 0) return 0;
+            var monthlyRate = Debt.InterestRate / 100m / 12m;
+            if (monthlyRate <= 0) return (int)Math.Ceiling(Debt.CurrentBalance / Debt.MonthlyPayment);
+            if (Debt.MonthlyPayment <= Debt.CurrentBalance * monthlyRate) return 0;
+            var n = (double)(Debt.MonthlyPayment / (Debt.MonthlyPayment - Debt.CurrentBalance * monthlyRate));
+            var logN = Math.Log(n);
+            var log1r = Math.Log(1 + (double)monthlyRate);
+            return Math.Max(0, (int)Math.Ceiling(logN / log1r));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (!auth.User.Identity?.IsAuthenticated ?? true)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(uid, out UserId))
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        try
+        {
+            Debt = await DebtService.GetByIdAsync(DebtId, UserId);
+            if (Debt != null)
+            {
+                Payments = (await PaymentService.GetByDebtIdAsync(DebtId)).OrderByDescending(p => p.PaymentDate).ToList();
+            }
+        }
+        catch { }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task LoadPaymentsAsync()
+    {
+        PaymentsLoading = true;
+        try
+        {
+            Payments = (await PaymentService.GetByDebtIdAsync(DebtId)).OrderByDescending(p => p.PaymentDate).ToList();
+        }
+        catch { }
+        finally
+        {
+            PaymentsLoading = false;
+        }
+    }
+
+    // ───── Quick Payment ─────
+    private async Task QuickPayAsync()
+    {
+        QuickError = null;
+        QuickSuccess = null;
+
+        var amount = QuickAmount > 0 ? QuickAmount : Debt?.MonthlyPayment ?? 0;
+        if (amount <= 0)
+        {
+            QuickError = "El monto debe ser mayor a 0.";
+            return;
+        }
+
+        QuickLoading = true;
+        try
+        {
+            var idempotencyKey = $"payment:{UserId}:{DebtId}:{Guid.NewGuid():n}";
+            await PaymentService.CreatePaymentAsync(
+                DebtId, amount, QuickPaymentType, QuickWasOnTime,
+                QuickPaymentType == "prepayment" ? QuickPrepaymentEffect : null,
+                idempotencyKey);
+            QuickSuccess = $"Pago de {FormatMoney(amount)} registrado.";
+            QuickAmount = 0;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            QuickError = ex.Message;
+        }
+        finally
+        {
+            QuickLoading = false;
+        }
+    }
+
+    // ───── Mini Calculator ─────
+    private async Task SimulatePrepayAsync()
+    {
+        PrepError = null;
+        PrepResult = null;
+
+        if (PrepExtraAmount <= 0)
+        {
+            PrepError = "El monto extra debe ser mayor a 0.";
+            return;
+        }
+
+        PrepLoading = true;
+        try
+        {
+            PrepResult = await CalcService.AnalyzePrepaymentAsync(UserId,
+                new services.Models.PrepaymentAnalysisRequest { DebtId = DebtId, ExtraAmount = PrepExtraAmount });
+        }
+        catch (Exception ex)
+        {
+            PrepError = ex.Message;
+        }
+        finally
+        {
+            PrepLoading = false;
+        }
+    }
+
+    // ───── CSV Export ─────
+    private async Task ExportCsvAsync()
+    {
+        if (Debt == null) return;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("=== Información de la Deuda ===");
+        sb.AppendLine($"Nombre,{Debt.Name}");
+        sb.AppendLine($"Monto Original,{Debt.OriginalAmount}");
+        sb.AppendLine($"Saldo Actual,{Debt.CurrentBalance}");
+        sb.AppendLine($"Tasa de Interés,{Debt.InterestRate}%");
+        sb.AppendLine($"Pago Mensual,{Debt.MonthlyPayment}");
+        sb.AppendLine($"Fecha de Inicio,{Debt.StartDate:yyyy-MM-dd}");
+        sb.AppendLine($"Fecha de Vencimiento,{Debt.DueDate:yyyy-MM-dd}");
+        sb.AppendLine();
+
+        sb.AppendLine("=== Pagos ===");
+        sb.AppendLine("Fecha,Monto,Tipo,A Tiempo,Efecto");
+        foreach (var p in Payments)
+        {
+            var tipo = p.PaymentType == "prepayment" ? "Prepago" : "Cotidiano";
+            var effect = p.PrepaymentEffect switch
+            {
+                "reduceTerm" => "Reducir plazo",
+                "reducePayment" => "Reducir cuota",
+                _ => ""
+            };
+            sb.AppendLine($"{p.PaymentDate:yyyy-MM-dd},{p.Amount},{tipo},{(p.WasOnTime ? "Sí" : "No")},{effect}");
+        }
+        sb.AppendLine();
+        sb.AppendLine($"Total Pagado,{Payments.Sum(p => p.Amount)}");
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFile", $"deuda_{Debt.Name}_{DateTime.Now:yyyyMMdd}.csv", base64);
+    }
+
+    private static string TipoLabel(string t) => t switch
+    {
+        "prepayment" => "Prepago",
+        _ => "Cotidiano"
+    };
+
+    private static string EffectLabel(string? e) => e switch
+    {
+        "reduceTerm" => "Reducir plazo",
+        "reducePayment" => "Reducir cuota",
+        _ => "—"
+    };
+
+    private static string FormatMoney(decimal val) =>
+        val.ToString("C0", new System.Globalization.CultureInfo("en-US"));
+}

@@ -225,17 +225,20 @@ Todas las rutas requieren `Authorization: Bearer <token>` **excepto** las marcad
 | `GET` | `/api/calculator/strategy` | Estrategia Snowball vs Avalanche |
 | `GET` | `/api/calculator/daily-interest` | Interés diario/mensual/anual por deuda |
 
-**GET `/api/calculator/strategy`**
+**GET `/api/calculator/strategy?monthlyPayment=32500`**
+
+Simulación mes a mes de la estrategia de pago. `monthlyPayment` opcional (por defecto suma de pagos mensuales actuales).
 ```json
 {
-  "totalMonthlyPayment": 32500.00,
-  "totalDebts": 3,
+  "snowballMonths": 2,
+  "avalancheMonths": 2,
   "snowball": [
-    { "id": "guid", "name": "TC", "currentBalance": 120000.00, "interestRate": 28.0, "monthlyPayment": 10000.00, "payoffOrder": 1, "estimatedMonths": 13, "estimatedPayoffDate": "2027-07-23" },
-    { "id": "guid", "name": "Auto", "currentBalance": 350000.00, "interestRate": 10.0, "monthlyPayment": 15000.00, "payoffOrder": 2, "estimatedMonths": 27, "estimatedPayoffDate": "2028-09-23" }
+    { "month": 1, "debtName": "TC", "paymentAmount": 120000.00, "remainingBalance": 0 },
+    { "month": 2, "debtName": "Auto", "paymentAmount": 350000.00, "remainingBalance": 0 }
   ],
   "avalanche": [
-    { "id": "guid", "name": "TC", "currentBalance": 120000.00, "interestRate": 28.0, "monthlyPayment": 10000.00, "payoffOrder": 1, "estimatedMonths": 13, "estimatedPayoffDate": "2027-07-23" }
+    { "month": 1, "debtName": "Auto", "paymentAmount": 32500.00, "remainingBalance": 317500.00 },
+    { "month": 2, "debtName": "Auto", "paymentAmount": 32500.00, "remainingBalance": 285000.00 }
   ]
 }
 ```
@@ -244,11 +247,12 @@ Todas las rutas requieren `Authorization: Bearer <token>` **excepto** las marcad
 ```json
 {
   "items": [
-    { "id": "guid", "name": "Auto", "currentBalance": 350000.00, "interestRate": 10.0, "dailyInterest": 95.89, "monthlyInterest": 2916.67, "yearlyInterest": 35000.00 }
+    { "id": "guid", "name": "Auto", "debtName": "Auto", "currentBalance": 350000.00, "interestRate": 10.0, "dailyInterest": 95.89, "monthlyInterest": 2916.67, "yearlyInterest": 35000.00 }
   ],
   "totalDaily": 95.89,
   "totalMonthly": 2916.67,
-  "totalYearly": 35000.00
+  "totalYearly": 35000.00,
+  "totalDailyInterest": 95.89
 }
 ```
 

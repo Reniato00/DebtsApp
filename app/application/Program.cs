@@ -1,24 +1,19 @@
 using application.Components;
-using application.Services;
 using application.Auth;
 using Microsoft.AspNetCore.Components.Authorization;
+using persistence.Extensions;
+using services.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = true);
 
-var apiUrl = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:7024";
+builder.Services.AddMemoryCache();
 
-builder.Services.AddScoped<HttpClient>(sp =>
-{
-    var client = new HttpClient { BaseAddress = new Uri(apiUrl), Timeout = TimeSpan.FromSeconds(30) };
-    return client;
-});
+builder.Services.AddPersistence();
+builder.Services.AddApplication();
 
-builder.Services.AddScoped<TokenStore>();
-builder.Services.AddScoped<ApiClient>();
-builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 builder.Services.AddAuthorizationCore();
 
@@ -31,6 +26,21 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; " +
+        "font-src 'self'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'; " +
+        "connect-src 'self' ws:;";
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseAntiforgery();
 

@@ -1,6 +1,6 @@
 @page "/login"
 @layout Layout.BlankLayout
-@inject AuthService Auth
+@inject services.Services.IAuthService Auth
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
 
@@ -84,6 +84,8 @@
                 return;
             }
 
+            var provider = (application.Auth.CustomAuthStateProvider)AuthState;
+
             if (ShowRegister)
             {
                 if (string.IsNullOrWhiteSpace(Name))
@@ -91,14 +93,15 @@
                     Error = "El nombre es requerido";
                     return;
                 }
-                await Auth.RegisterAsync(Email, Name, Password);
+                var (userId, userName) = await Auth.RegisterAsync(Email, Name, Password);
+                provider.SignIn(userId, userName);
             }
             else
             {
-                await Auth.LoginAsync(Email, Password);
+                var (userId, userName) = await Auth.LoginAsync(Email, Password);
+                provider.SignIn(userId, userName);
             }
 
-            await ((CustomAuthStateProvider)AuthState).NotifyAuthStateChanged();
             Nav.NavigateTo("/dashboard");
         }
         catch (Exception ex)
@@ -110,4 +113,6 @@
             Loading = false;
         }
     }
+
+
 }

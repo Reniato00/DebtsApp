@@ -1,6 +1,7 @@
 ﻿using application.Services;
 using debts.api.Responses;
 using Microsoft.AspNetCore.Mvc;
+using persistence.Models;
 
 namespace debts.api.Controllers
 {
@@ -12,9 +13,11 @@ namespace debts.api.Controllers
     public class DashboardController : ControllerBase
     {
         private readonly IDashboardService dashboardService;
-        public DashboardController(IDashboardService dashboardService)
+        private readonly IPaymentService paymentService;
+        public DashboardController(IDashboardService dashboardService, IPaymentService paymentService)
         {
             this.dashboardService = dashboardService;
+            this.paymentService = paymentService;
         }
 
         /// <summary>
@@ -80,7 +83,15 @@ namespace debts.api.Controllers
         public async Task<IActionResult> GetUpcomingPayments([FromHeader] Guid userId)
         {
             var debts = await dashboardService.GetUpcomingPaymentsAsync(userId);
-            return Ok(debts);
+            var result = debts.Select(d => new UpcomingPaymentResponse
+            {
+                DebtId = d.Id,
+                DebtName = d.Name,
+                Amount = d.MonthlyPayment,
+                DueDate = d.DueDate,
+                DaysUntilDue = Math.Max(0, (int)(d.DueDate.Date - DateTime.UtcNow.Date).TotalDays)
+            });
+            return Ok(result);
         }
 
         /// <summary>
@@ -91,7 +102,7 @@ namespace debts.api.Controllers
         [HttpGet("payment-history")]
         public async Task<IActionResult> GetPaymentHistory([FromHeader] Guid userId)
         {
-            var payments = await dashboardService.GetPaymentHistoryAsync(userId);
+            var payments = await paymentService.GetPaymentHistoryWithDebtNameAsync(userId);
             return Ok(payments);
         }
 

@@ -14,5 +14,14 @@ namespace debts.api.Requests.Payments
         /// <summary>Monto del pago.</summary>
         [Range(0.01, double.MaxValue)]
         public decimal Amount { get; set; }
+
+        /// <summary>Tipo de pago: "regular" (cotidiano) o "prepayment" (prepago).</summary>
+        public string PaymentType { get; set; } = "regular";
+
+        /// <summary>Indica si el pago se realizó a tiempo.</summary>
+        public bool WasOnTime { get; set; } = true;
+
+        /// <summary>Efecto del prepago: "reduceTerm" o "reducePayment" (solo si PaymentType = prepayment).</summary>
+        public string? PrepaymentEffect { get; set; }
     }
 }

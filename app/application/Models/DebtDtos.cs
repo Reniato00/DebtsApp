@@ -15,6 +15,7 @@ public class DebtDto
 
 public class CreateDebtRequest
 {
+    public Guid UserId { get; set; }
     public string Name { get; set; } = "";
     public decimal OriginalAmount { get; set; }
     public decimal CurrentBalance { get; set; }

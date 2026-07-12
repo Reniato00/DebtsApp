@@ -44,20 +44,18 @@ public class CalculatorServiceTests
         var result = await service.GetPayoffStrategyAsync(userId);
 
         Assert.IsNotNull(result);
-        Assert.AreEqual(3, result.TotalDebts);
-        Assert.AreEqual(450, result.TotalMonthlyPayment);
-        Assert.AreEqual(3, result.Snowball.Count);
-        Assert.AreEqual(3, result.Avalanche.Count);
+        Assert.IsTrue(result.Snowball.Count > 0);
+        Assert.IsTrue(result.Avalanche.Count > 0);
+        Assert.IsTrue(result.SnowballMonths > 0);
+        Assert.IsTrue(result.AvalancheMonths > 0);
 
-        // Snowball: sorted by balance ascending → B, C, A
-        Assert.AreEqual(1000, result.Snowball[0].CurrentBalance);
-        Assert.AreEqual(3000, result.Snowball[1].CurrentBalance);
-        Assert.AreEqual(5000, result.Snowball[2].CurrentBalance);
+        // Snowball: B paid first (lowest balance)
+        Assert.AreEqual("B", result.Snowball[0].DebtName);
+        Assert.AreEqual(1, result.Snowball[0].Month);
+        Assert.AreEqual(450, result.Snowball[0].PaymentAmount);
 
-        // Avalanche: sorted by rate descending → C (15%), A (10%), B (5%)
-        Assert.AreEqual(15, result.Avalanche[0].InterestRate);
-        Assert.AreEqual(10, result.Avalanche[1].InterestRate);
-        Assert.AreEqual(5, result.Avalanche[2].InterestRate);
+        // Avalanche: C paid first (highest rate)
+        Assert.AreEqual("C", result.Avalanche[0].DebtName);
     }
 
     [TestMethod]
@@ -69,13 +67,16 @@ public class CalculatorServiceTests
 
         var result = await service.GetPayoffStrategyAsync(userId);
 
-        // 1000 / 250 = 4 months
-        Assert.AreEqual(4, result.Snowball[0].EstimatedMonths);
-        Assert.IsNotNull(result.Snowball[0].EstimatedPayoffDate);
+        Assert.AreEqual(4, result.Snowball.Count);
+        Assert.AreEqual(4, result.SnowballMonths);
+        Assert.AreEqual("Test", result.Snowball[0].DebtName);
+        Assert.AreEqual(250, result.Snowball[0].PaymentAmount);
+        Assert.AreEqual(750, result.Snowball[0].RemainingBalance);
+        Assert.AreEqual(0, result.Snowball[^1].RemainingBalance);
     }
 
     [TestMethod]
-    public async Task GetPayoffStrategyAsync_ZeroPayment_ReturnsZeroMonths()
+    public async Task GetPayoffStrategyAsync_ZeroMonthlyPayment_ReturnsEmpty()
     {
         var userId = Guid.NewGuid();
         var debts = new[] { MakeDebt(1000, 5, 0) };
@@ -83,8 +84,10 @@ public class CalculatorServiceTests
 
         var result = await service.GetPayoffStrategyAsync(userId);
 
-        Assert.AreEqual(0, result.Snowball[0].EstimatedMonths);
-        Assert.IsNull(result.Snowball[0].EstimatedPayoffDate);
+        Assert.AreEqual(0, result.Snowball.Count);
+        Assert.AreEqual(0, result.Avalanche.Count);
+        Assert.AreEqual(0, result.SnowballMonths);
+        Assert.AreEqual(0, result.AvalancheMonths);
     }
 
     [TestMethod]
@@ -95,10 +98,10 @@ public class CalculatorServiceTests
 
         var result = await service.GetPayoffStrategyAsync(userId);
 
-        Assert.AreEqual(0, result.TotalDebts);
         Assert.AreEqual(0, result.Snowball.Count);
         Assert.AreEqual(0, result.Avalanche.Count);
-        Assert.AreEqual(0, result.TotalMonthlyPayment);
+        Assert.AreEqual(0, result.SnowballMonths);
+        Assert.AreEqual(0, result.AvalancheMonths);
     }
 
     [TestMethod]
@@ -122,12 +125,12 @@ public class CalculatorServiceTests
         Assert.IsNotNull(result);
         Assert.AreEqual(2, result.Items.Count);
 
-        // Debt1: 10000 * 0.05 / 365 = 1.3698...
-        // Debt2: 5000 * 0.10 / 365 = 1.3698...
-        // So total daily ≈ 2.74
         Assert.IsTrue(result.TotalDaily > 0);
         Assert.IsTrue(result.TotalMonthly > 0);
         Assert.IsTrue(result.TotalYearly > 0);
+        Assert.AreEqual(result.TotalDaily, result.TotalDailyInterest);
+        Assert.AreEqual("Debt1", result.Items[0].DebtName);
+        Assert.AreEqual("Debt2", result.Items[1].DebtName);
     }
 
     [TestMethod]
@@ -142,6 +145,7 @@ public class CalculatorServiceTests
         Assert.AreEqual(0, result.TotalDaily);
         Assert.AreEqual(0, result.TotalMonthly);
         Assert.AreEqual(0, result.TotalYearly);
+        Assert.AreEqual(0, result.TotalDailyInterest);
     }
 
     [TestMethod]

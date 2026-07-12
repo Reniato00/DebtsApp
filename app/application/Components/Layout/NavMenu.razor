@@ -1,6 +1,9 @@
-﻿@inject AuthService Auth
+﻿@inject services.Services.IAuthService Auth
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
+@inject services.Services.IDebtService DebtService
+@inject services.Services.IPaymentService PaymentService
+@inject IJSRuntime JS
 
 <div class="navbar-brand">DebtsApp</div>
 
@@ -19,14 +22,19 @@
                 </NavLink>
             </div>
             <div class="nav-item">
-                <NavLink class="nav-link" href="dashboard">
-                    Dashboard
-                </NavLink>
-            </div>
-            <div class="nav-item">
                 <NavLink class="nav-link" href="calculator">
                     Calculadora
                 </NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="pagos">
+                    Pagos
+                </NavLink>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="javascript:void(0)" @onclick="ExportCsvAsync">
+                    Exportar CSV
+                </a>
             </div>
         </Authorized>
     </AuthorizeView>
@@ -50,8 +58,43 @@
 @code {
     private async Task LogoutAsync()
     {
-        await Auth.LogoutAsync();
-        await ((CustomAuthStateProvider)AuthState).NotifyAuthStateChanged();
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var userIdStr = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(userIdStr, out var userId))
+            await Auth.LogoutAsync(userId);
+        ((application.Auth.CustomAuthStateProvider)AuthState).SignOut();
         Nav.NavigateTo("/login");
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var userIdStr = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId)) return;
+
+            var debts = await DebtService.GetAllDebtsAsync(userId);
+            var payments = await PaymentService.GetPaymentHistoryAsync(userId);
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== Debts ===");
+            sb.AppendLine("Id,Name,OriginalAmount,CurrentBalance,InterestRate,MonthlyPayment,StartDate,DueDate");
+            foreach (var d in debts)
+                sb.AppendLine($"{d.Id},{d.Name},{d.OriginalAmount},{d.CurrentBalance},{d.InterestRate},{d.MonthlyPayment},{d.StartDate:yyyy-MM-dd},{d.DueDate:yyyy-MM-dd}");
+
+            sb.AppendLine();
+            sb.AppendLine("=== Payments ===");
+            sb.AppendLine("Id,DebtId,Amount,PaymentDate");
+            foreach (var p in payments)
+                sb.AppendLine($"{p.Id},{p.DebtId},{p.Amount},{p.PaymentDate:yyyy-MM-dd}");
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            await JS.InvokeVoidAsync("downloadFile", $"deudas_{DateTime.Now:yyyyMMdd}.csv", base64);
+        }
+        catch
+        {
+        }
     }
 }

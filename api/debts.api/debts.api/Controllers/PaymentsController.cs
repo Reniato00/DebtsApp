@@ -26,9 +26,12 @@ namespace debts.api.Controllers
         /// <param name="body">Datos del pago (DebtId y Amount).</param>
         /// <returns>El pago creado con su Id asignado.</returns>
         [HttpPost]
-        public async Task<IActionResult> CreatePayment([FromBody] CreatePaymentRequest body)
+        public async Task<IActionResult> CreatePayment(
+            [FromBody] CreatePaymentRequest body,
+            [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey = null)
         {
-            var payment = await paymentService.CreatePaymentAsync(body.DebtId, body.Amount);
+            var payment = await paymentService.CreatePaymentAsync(
+                body.DebtId, body.Amount, body.PaymentType, body.WasOnTime, body.PrepaymentEffect, idempotencyKey);
             return CreatedAtAction(nameof(GetById), new { id = payment.Id }, payment);
         }
 

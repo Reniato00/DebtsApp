@@ -1,5 +1,8 @@
 @page "/calculator"
-@inject ApiClient Api
+@using domain.Entities
+@using services.Models
+@inject services.Services.ICalculatorService CalcService
+@inject services.Services.IDebtService DebtService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 
@@ -13,6 +16,9 @@
     </li>
     <li class="nav-item">
         <a class="nav-link @(ActiveTab == "daily" ? "active" : "")" href="javascript:void(0)" @onclick="ShowDaily">Interés diario</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(ActiveTab == "prepayment" ? "active" : "")" href="javascript:void(0)" @onclick="ShowPrepayment">Simular prepago</a>
     </li>
 </ul>
 
@@ -52,6 +58,17 @@
                 </li>
             </ul>
 
+            <div class="alert alert-info py-2 small mb-3">
+                @if (ShowAvalanche)
+                {
+                    <text><strong>Avalanche:</strong> Ordena las deudas de mayor a menor tasa de inter&eacute;s. Pagas el m&iacute;nimo en todas excepto la de inter&eacute;s m&aacute;s alto. Es la estrategia &oacute;ptima matem&aacute;ticamente &mdash; pagar&aacute;s menos intereses totales.</text>
+                }
+                else
+                {
+                    <text><strong>Snowball:</strong> Ordena las deudas de menor a mayor saldo. Pagas el m&iacute;nimo en todas excepto la m&aacute;s peque&ntilde;a. La ventaja es psicol&oacute;gica &mdash; al liquidar deudas r&aacute;pido te motiva a seguir.</text>
+                }
+            </div>
+
             var steps = Steps;
             var totalMonths = TotalMonths;
 
@@ -89,7 +106,7 @@
         }
     </div>
 }
-else
+else if (ActiveTab == "daily")
 {
     @* ───── Interés Diario ───── *@
     <div class="card p-4 mb-4">
@@ -147,17 +164,129 @@ else
         }
     </div>
 }
+else if (ActiveTab == "prepayment")
+{
+    @* ───── Simulador de Prepago ───── *@
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Simular prepago</h5>
+        <p class="text-muted small">Calcula el impacto de hacer un pago extra a una deuda específica.</p>
+
+        <div class="d-flex gap-3 align-items-end mb-3 flex-wrap">
+            <div style="min-width:250px">
+                <label class="form-label">Deuda</label>
+                <select @bind="PrepaymentDebtId" class="form-select">
+                    <option value="">Seleccionar...</option>
+                    @foreach (var d in DebtList)
+                    {
+                        <option value="@d.Id">@d.Name — @FormatMoney(d.CurrentBalance)</option>
+                    }
+                </select>
+            </div>
+            <div style="max-width:200px">
+                <label class="form-label">Pago extra ($)</label>
+                <input type="number" min="0" step="0.01" @bind="PrepaymentExtraAmount" class="form-control" />
+            </div>
+            <button class="btn btn-primary" @onclick="LoadPrepaymentAsync" disabled="@PrepaymentLoading">Calcular</button>
+        </div>
+
+        @if (PrepaymentLoading)
+        {
+            <div class="d-flex justify-content-center py-3">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            </div>
+        }
+        else if (PrepaymentResult != null)
+        {
+            var r = PrepaymentResult;
+            <div class="row g-3">
+                @* ── Situación actual ── *@
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-title">Situación actual</h6>
+                            <hr />
+                            <p class="mb-1"><strong>@r.DebtName</strong></p>
+                            <p class="mb-1">Saldo: @FormatMoney(r.CurrentBalance)</p>
+                            <p class="mb-1">Pago mensual: @FormatMoney(r.CurrentMonthlyPayment)</p>
+                            <p class="mb-1">Meses restantes: <strong>@r.CurrentRemainingMonths</strong></p>
+                            <p class="mb-0">Interés total: <span class="negative">@FormatMoney(r.CurrentTotalInterest)</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Reducir plazo ── *@
+                <div class="col-md-4">
+                    <div class="card h-100 border-success">
+                        <div class="card-body">
+                            <h6 class="card-title text-success">Reducir plazo</h6>
+                            <p class="text-muted small">Misma mensualidad, menos meses.</p>
+                            <hr />
+                            <p class="mb-1">Pago mensual: @FormatMoney(r.ReduceTerm.NewMonthlyPayment)</p>
+                            <p class="mb-1">Meses restantes: <strong>@r.ReduceTerm.RemainingMonths</strong></p>
+                            @if (r.ReduceTerm.MonthsSaved > 0)
+                            {
+                                <p class="mb-1 text-success">Te ahorras <strong>@r.ReduceTerm.MonthsSaved meses</strong></p>
+                            }
+                            <p class="mb-1">Interés total: <span class="negative">@FormatMoney(r.ReduceTerm.TotalInterest)</span></p>
+                            @if (r.ReduceTerm.InterestSaved > 0)
+                            {
+                                <p class="mb-0 text-success">Ahorras @FormatMoney(r.ReduceTerm.InterestSaved) en intereses</p>
+                            }
+                            @if (r.ReduceTerm.PayoffDate.HasValue)
+                            {
+                                <p class="mb-0 small text-muted">Pagas en: @r.ReduceTerm.PayoffDate.Value.ToString("MMM yyyy")</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Reducir cuota ── *@
+                <div class="col-md-4">
+                    <div class="card h-100 border-info">
+                        <div class="card-body">
+                            <h6 class="card-title text-info">Reducir cuota</h6>
+                            <p class="text-muted small">Mismo plazo, menos pago mensual.</p>
+                            <hr />
+                            <p class="mb-1">Nuevo pago: @FormatMoney(r.ReducePayment.NewMonthlyPayment)</p>
+                            @if (r.CurrentMonthlyPayment > 0)
+                            {
+                                var savedPerMonth = r.CurrentMonthlyPayment - r.ReducePayment.NewMonthlyPayment;
+                                <p class="mb-1 text-info">Pagas @FormatMoney(savedPerMonth) menos al mes</p>
+                            }
+                            <p class="mb-1">Meses restantes: <strong>@r.ReducePayment.RemainingMonths</strong></p>
+                            <p class="mb-1">Interés total: <span class="negative">@FormatMoney(r.ReducePayment.TotalInterest)</span></p>
+                            @if (r.ReducePayment.InterestSaved > 0)
+                            {
+                                <p class="mb-0 text-success">Ahorras @FormatMoney(r.ReducePayment.InterestSaved) en intereses</p>
+                            }
+                            @if (r.ReducePayment.PayoffDate.HasValue)
+                            {
+                                <p class="mb-0 small text-muted">Pagas en: @r.ReducePayment.PayoffDate.Value.ToString("MMM yyyy")</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger mt-3">@ErrorMessage</div>
+}
 
 @code {
     private string ActiveTab = "strategy";
+    private string? ErrorMessage;
 
     // Strategy
     private decimal MonthlyPayment = 1000;
     private bool StrategyLoading;
-    private PayoffStrategyResultDto? StrategyResult;
+    private PayoffStrategyResult? StrategyResult;
     private bool ShowAvalanche;
 
-    private List<PayoffStepDto> Steps =>
+    private List<PayoffStep> Steps =>
         ShowAvalanche ? (StrategyResult?.Avalanche ?? new()) : (StrategyResult?.Snowball ?? new());
 
     private int TotalMonths =>
@@ -165,10 +294,20 @@ else
 
     // Daily
     private bool DailyLoading;
-    private DailyInterestResultDto? DailyResult;
+    private DailyInterestResult? DailyResult;
 
-    private void ShowStrategy() => ActiveTab = "strategy";
-    private void ShowDaily() => ActiveTab = "daily";
+    // Prepayment
+    private List<Debt> DebtList = new();
+    private Guid? PrepaymentDebtId;
+    private decimal PrepaymentExtraAmount = 0;
+    private bool PrepaymentLoading;
+    private PrepaymentAnalysisResult? PrepaymentResult;
+
+    private Guid UserId;
+
+    private void ShowStrategy() { ActiveTab = "strategy"; ErrorMessage = null; }
+    private void ShowDaily() { ActiveTab = "daily"; ErrorMessage = null; }
+    private void ShowPrepayment() { ActiveTab = "prepayment"; ErrorMessage = null; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -179,7 +318,34 @@ else
             return;
         }
 
+        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(uid, out UserId))
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
         await LoadDailyAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadDebtsAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadDebtsAsync()
+    {
+        try
+        {
+            DebtList = (await DebtService.GetAllDebtsAsync(UserId)).ToList();
+        }
+        catch
+        {
+        }
     }
 
     private async Task LoadStrategyAsync()
@@ -189,8 +355,7 @@ else
         StrategyResult = null;
         try
         {
-            StrategyResult = await Api.GetAsync<PayoffStrategyResultDto>(
-                $"api/calculator/strategy?monthlyPayment={MonthlyPayment}");
+            StrategyResult = await CalcService.GetPayoffStrategyAsync(UserId, MonthlyPayment);
         }
         catch
         {
@@ -206,7 +371,7 @@ else
         DailyLoading = true;
         try
         {
-            DailyResult = await Api.GetAsync<DailyInterestResultDto>("api/calculator/daily-interest");
+            DailyResult = await CalcService.GetDailyInterestAsync(UserId);
         }
         catch
         {
@@ -214,6 +379,37 @@ else
         finally
         {
             DailyLoading = false;
+        }
+    }
+
+    private async Task LoadPrepaymentAsync()
+    {
+        ErrorMessage = null;
+        if (!PrepaymentDebtId.HasValue)
+        {
+            ErrorMessage = "Selecciona una deuda.";
+            return;
+        }
+        if (PrepaymentExtraAmount <= 0)
+        {
+            ErrorMessage = "El monto extra debe ser mayor a 0.";
+            return;
+        }
+
+        PrepaymentLoading = true;
+        PrepaymentResult = null;
+        try
+        {
+            PrepaymentResult = await CalcService.AnalyzePrepaymentAsync(UserId,
+                new PrepaymentAnalysisRequest { DebtId = PrepaymentDebtId.Value, ExtraAmount = PrepaymentExtraAmount });
+        }
+        catch
+        {
+            ErrorMessage = "Error al calcular. Verifica que el monto no supere el saldo.";
+        }
+        finally
+        {
+            PrepaymentLoading = false;
         }
     }
 
