@@ -1,0 +1,41 @@
+@using persistence.Models
+
+<div class="card p-3 h-100">
+    <h5 class="section-title">Últimos pagos</h5>
+    @if (Items == null)
+    {
+        <LoadingSpinner />
+    }
+    else if (Items.Count == 0)
+    {
+        <p class="text-muted small mb-0">No hay pagos registrados.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Deuda</th>
+                        <th>Monto</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Items)
+                    {
+                        <tr>
+                            <td>@p.DebtName</td>
+                            <td class="negative">@FormattingHelpers.FormatMoney(p.Amount)</td>
+                            <td>@p.PaymentDate.ToShortDateString()</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<PaymentWithDebtName>? Items { get; set; }
+}

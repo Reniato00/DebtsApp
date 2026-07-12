@@ -1,0 +1,31 @@
+@using persistence.Models
+
+@if (Summary == null)
+{
+    <LoadingSpinner FullPage="true" />
+}
+else
+{
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total deudas</div>
+            <div class="stat-value neutral">@Summary.TotalDebts</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Saldo total</div>
+            <div class="stat-value negative">@FormattingHelpers.FormatMoney(Summary.TotalAmount)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Pago mensual total</div>
+            <div class="stat-value negative">@FormattingHelpers.FormatMoney(Summary.TotalMonthlyPayment)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Tasa de interés promedio</div>
+            <div class="stat-value neutral">@Summary.AverageInterestRate.ToString("N1")%</div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public DebtSummaryResult? Summary { get; set; }
+}

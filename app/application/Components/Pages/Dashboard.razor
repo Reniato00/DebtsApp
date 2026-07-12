@@ -11,178 +11,22 @@
 
 <h3 class="mb-4">Dashboard</h3>
 
-@if (Summary == null)
-{
-    <LoadingSpinner FullPage="true" />
-}
-else
-{
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-label">Total deudas</div>
-            <div class="stat-value neutral">@Summary.TotalDebts</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Saldo total</div>
-            <div class="stat-value negative">@FormattingHelpers.FormatMoney(Summary.TotalAmount)</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Pago mensual total</div>
-            <div class="stat-value negative">@FormattingHelpers.FormatMoney(Summary.TotalMonthlyPayment)</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Tasa de interés promedio</div>
-            <div class="stat-value neutral">@Summary.AverageInterestRate.ToString("N1")%</div>
-        </div>
-    </div>
+<StatsGrid Summary="@Summary" />
 
+@if (Summary != null)
+{
     <div class="row g-4">
-        @* ───── Próximos pagos ───── *@
         <div class="col-md-6">
-            <div class="card p-3 h-100">
-                <h5 class="section-title">Próximos pagos</h5>
-                @if (Upcoming == null)
-                {
-                    <LoadingSpinner />
-                }
-                else if (Upcoming.Count == 0)
-                {
-                    <p class="text-muted small mb-0">No hay pagos próximos.</p>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Deuda</th>
-                                    <th>Monto</th>
-                                    <th>Vence</th>
-                                    <th>Días</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var p in Upcoming)
-                                {
-                                    <tr class="@(p.DaysUntilDue <= 7 ? "table-warning" : "")">
-                                        <td>@p.DebtName</td>
-                                        <td>@FormattingHelpers.FormatMoney(p.Amount)</td>
-                                        <td>@p.DueDate.ToShortDateString()</td>
-                                        <td>@p.DaysUntilDue días</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
+            <UpcomingPaymentsCard Items="@Upcoming" />
         </div>
-
-        @* ───── Historial de pagos ───── *@
         <div class="col-md-6">
-            <div class="card p-3 h-100">
-                <h5 class="section-title">Últimos pagos</h5>
-                @if (History == null)
-                {
-                    <LoadingSpinner />
-                }
-                else if (History.Count == 0)
-                {
-                    <p class="text-muted small mb-0">No hay pagos registrados.</p>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Deuda</th>
-                                    <th>Monto</th>
-                                    <th>Fecha</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var p in History)
-                                {
-                                    <tr>
-                                        <td>@p.DebtName</td>
-                                        <td class="negative">@FormattingHelpers.FormatMoney(p.Amount)</td>
-                                        <td>@p.PaymentDate.ToShortDateString()</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
+            <RecentPaymentsCard Items="@History" />
         </div>
-
-        @* ───── Pagado vs Pendiente ───── *@
         <div class="col-md-6">
-            <div class="card p-3">
-                <h5 class="section-title">Pagado vs Pendiente</h5>
-                @if (PaidVsPending == null)
-                {
-                    <LoadingSpinner />
-                }
-                else
-                {
-                    <div class="d-flex gap-4">
-                        <div>
-                            <div class="stat-label">Pagado</div>
-                            <div class="stat-value positive" style="font-size:1.4rem">@FormattingHelpers.FormatMoney(PaidVsPending.TotalPaid)</div>
-                        </div>
-                        <div>
-                            <div class="stat-label">Pendiente</div>
-                            <div class="stat-value negative" style="font-size:1.4rem">@FormattingHelpers.FormatMoney(PaidVsPending.TotalPending)</div>
-                        </div>
-                    </div>
-                    <div class="progress mt-2" style="height:8px">
-                        <div class="progress-bar bg-success" style="width:@(PaidPct)%"></div>
-                        <div class="progress-bar bg-danger" style="width:@(100 - PaidPct)%"></div>
-                    </div>
-                    <small class="text-muted">@PaidPct.ToString("N0")% pagado</small>
-                }
-            </div>
+            <PaidVsPendingCard Data="@PaidVsPending" />
         </div>
-
-        @* ───── Costo de intereses ───── *@
         <div class="col-md-6">
-            <div class="card p-3">
-                <h5 class="section-title">Costo de intereses</h5>
-                @if (InterestCost == null)
-                {
-                    <LoadingSpinner />
-                }
-                else if (InterestCost.Count == 0)
-                {
-                    <p class="text-muted small mb-0">No hay datos.</p>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Deuda</th>
-                                    <th>Pagado</th>
-                                    <th>Restante</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var c in InterestCost)
-                                {
-                                    <tr>
-                                        <td>@c.Name</td>
-                                        <td>@FormattingHelpers.FormatMoney(c.TotalInterestPaid)</td>
-                                        <td class="negative">@FormattingHelpers.FormatMoney(c.RemainingInterest)</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
+            <InterestCostCard Items="@InterestCost" />
         </div>
     </div>
 }
@@ -240,15 +84,5 @@ else
             }).ToList();
         }
         catch { InterestCost = new(); }
-    }
-
-    private decimal PaidPct
-    {
-        get
-        {
-            if (PaidVsPending == null) return 0;
-            var total = PaidVsPending.TotalPaid + PaidVsPending.TotalPending;
-            return total > 0 ? Math.Round(PaidVsPending.TotalPaid / total * 100) : 0;
-        }
     }
 }

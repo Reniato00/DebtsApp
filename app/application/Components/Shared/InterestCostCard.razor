@@ -1,0 +1,41 @@
+@using application.Models
+
+<div class="card p-3">
+    <h5 class="section-title">Costo de intereses</h5>
+    @if (Items == null)
+    {
+        <LoadingSpinner />
+    }
+    else if (Items.Count == 0)
+    {
+        <p class="text-muted small mb-0">No hay datos.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Deuda</th>
+                        <th>Pagado</th>
+                        <th>Restante</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Items)
+                    {
+                        <tr>
+                            <td>@c.Name</td>
+                            <td>@FormattingHelpers.FormatMoney(c.TotalInterestPaid)</td>
+                            <td class="negative">@FormattingHelpers.FormatMoney(c.RemainingInterest)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<DebtInterestItem>? Items { get; set; }
+}

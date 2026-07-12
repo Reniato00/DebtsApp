@@ -1,0 +1,43 @@
+@using application.Models
+
+<div class="card p-3 h-100">
+    <h5 class="section-title">Próximos pagos</h5>
+    @if (Items == null)
+    {
+        <LoadingSpinner />
+    }
+    else if (Items.Count == 0)
+    {
+        <p class="text-muted small mb-0">No hay pagos próximos.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Deuda</th>
+                        <th>Monto</th>
+                        <th>Vence</th>
+                        <th>Días</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Items)
+                    {
+                        <tr class="@(p.DaysUntilDue <= 7 ? "table-warning" : "")">
+                            <td>@p.DebtName</td>
+                            <td>@FormattingHelpers.FormatMoney(p.Amount)</td>
+                            <td>@p.DueDate.ToShortDateString()</td>
+                            <td>@p.DaysUntilDue días</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<UpcomingPaymentItem>? Items { get; set; }
+}

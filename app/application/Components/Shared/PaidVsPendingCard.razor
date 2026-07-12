@@ -1,0 +1,42 @@
+@using services.Models
+
+<div class="card p-3">
+    <h5 class="section-title">Pagado vs Pendiente</h5>
+    @if (Data == null)
+    {
+        <LoadingSpinner />
+    }
+    else
+    {
+        var pct = PaidPct;
+        <div class="d-flex gap-4">
+            <div>
+                <div class="stat-label">Pagado</div>
+                <div class="stat-value positive" style="font-size:1.4rem">@FormattingHelpers.FormatMoney(Data.TotalPaid)</div>
+            </div>
+            <div>
+                <div class="stat-label">Pendiente</div>
+                <div class="stat-value negative" style="font-size:1.4rem">@FormattingHelpers.FormatMoney(Data.TotalPending)</div>
+            </div>
+        </div>
+        <div class="progress mt-2" style="height:8px">
+            <div class="progress-bar bg-success" style="width:@(pct)%"></div>
+            <div class="progress-bar bg-danger" style="width:@(100 - pct)%"></div>
+        </div>
+        <small class="text-muted">@pct.ToString("N0")% pagado</small>
+    }
+</div>
+
+@code {
+    [Parameter] public PaidVsPendingResult? Data { get; set; }
+
+    private decimal PaidPct
+    {
+        get
+        {
+            if (Data == null) return 0;
+            var total = Data.TotalPaid + Data.TotalPending;
+            return total > 0 ? Math.Round(Data.TotalPaid / total * 100) : 0;
+        }
+    }
+}
