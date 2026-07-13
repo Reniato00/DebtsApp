@@ -3,20 +3,28 @@ bin/
 obj/
 *.user
 *.suo
-*.sln.docstates
-*.userprefs
-packages/
+*.vs/
+*.DotSettings
 *.nupkg
+packages/
 
-## VS
-.vs/
-*.csproj.user
+## Build
+[Dd]ebug/
+[Rr]elease/
+*.exe
+*.dll
+*.pdb
 
 ## IDE
 .idea/
 .vscode/
 *.swp
+*~
 
 ## OS
-Thumbs.db
 .DS_Store
+Thumbs.db
+
+## Secrets (template only, keep actual secrets out of repo)
+appsettings.*.local.json
+appsettings.Production.json

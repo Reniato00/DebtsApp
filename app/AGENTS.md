@@ -2,7 +2,6 @@
 - Siempre preguntar antes de cambiar la lógica de negocio
 - No agregar comentarios al código a menos que se solicite
 - Mantener el código en español (UI) e inglés (código) según convención existente
-- Cada vez que se modifique el código, revisar los diagramas Mermaid en este archivo y actualizarlos si los cambios afectan la arquitectura, dependencias, flujos o componentes representados
 
 # Arquitectura del proyecto
 
