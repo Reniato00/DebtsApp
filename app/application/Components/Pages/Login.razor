@@ -28,10 +28,22 @@
         <input type="email" @bind="Email" class="form-control" placeholder="correo@ejemplo.com" />
     </div>
 
-    <div class="mb-4">
+    <div class="mb-3">
         <label class="form-label">Contraseña</label>
         <input type="password" @bind="Password" class="form-control" placeholder="••••••" />
     </div>
+
+    @if (ShowRegister)
+    {
+        <div class="mb-4">
+            <label class="form-label">Confirmar contraseña</label>
+            <input type="password" @bind="ConfirmPassword" class="form-control" placeholder="••••••" />
+        </div>
+    }
+    else
+    {
+        <div class="mb-4"></div>
+    }
 
     <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@Loading">
         @if (Loading)
@@ -55,6 +67,7 @@
 @code {
     private string Email = "";
     private string Password = "";
+    private string ConfirmPassword = "";
     private string Name = "";
     private string Error = "";
     private bool Loading;
@@ -78,13 +91,12 @@
                 Error = "El correo es requerido";
                 return;
             }
+
             if (string.IsNullOrWhiteSpace(Password))
             {
                 Error = "La contraseña es requerida";
                 return;
             }
-
-            var provider = (application.Auth.CustomAuthStateProvider)AuthState;
 
             if (ShowRegister)
             {
@@ -93,6 +105,18 @@
                     Error = "El nombre es requerido";
                     return;
                 }
+
+                if (Password != ConfirmPassword)
+                {
+                    Error = "Las contraseñas no coinciden";
+                    return;
+                }
+            }
+
+            var provider = (application.Auth.CustomAuthStateProvider)AuthState;
+
+            if (ShowRegister)
+            {
                 var (userId, userName) = await Auth.RegisterAsync(Email, Name, Password);
                 provider.SignIn(userId, userName);
             }
@@ -113,6 +137,4 @@
             Loading = false;
         }
     }
-
-
 }

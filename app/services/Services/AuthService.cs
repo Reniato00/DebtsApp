@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using persistence.Repositories;
 using domain.Entities;
 
@@ -15,9 +16,13 @@ namespace services.Services
     {
         private readonly IUserRepository userRepo;
         private static readonly ConcurrentDictionary<string, LoginAttempt> _failedAttempts = new();
+        private static readonly ConcurrentDictionary<string, DateTime> _registerLog = new();
 
-        private const int MaxAttempts = 5;
-        private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+        private const int MaxLoginAttempts = 5;
+        private const int MaxRegisterAttempts = 3;
+        private static readonly TimeSpan LoginLockoutDuration = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan RegisterWindow = TimeSpan.FromHours(1);
+        private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         public AuthService(IUserRepository userRepo)
         {
@@ -29,10 +34,16 @@ namespace services.Services
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("El correo es requerido");
 
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("El nombre es requerido");
+            if (!EmailRegex.IsMatch(email))
+                throw new ArgumentException("El correo no tiene un formato válido");
 
+            if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2)
+                throw new ArgumentException("El nombre debe tener al menos 2 caracteres");
+
+            CheckRegisterRateLimit(email);
             ValidatePassword(password);
+
+            _registerLog.AddOrUpdate(email, _ => DateTime.UtcNow, (_, _) => DateTime.UtcNow);
 
             var existing = await userRepo.GetByEmailAsync(email);
             if (existing != null)
@@ -41,8 +52,8 @@ namespace services.Services
             var user = new User
             {
                 Id = Guid.NewGuid(),
-                Name = name,
-                Email = email,
+                Name = name.Trim(),
+                Email = email.Trim().ToLowerInvariant(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(password)
             };
 
@@ -50,6 +61,7 @@ namespace services.Services
             if (created == null)
                 throw new Exception("Error al crear el usuario");
 
+            _registerLog.TryRemove(email, out _);
             return (created.Id, created.Name);
         }
 
@@ -61,9 +73,9 @@ namespace services.Services
             if (string.IsNullOrWhiteSpace(password))
                 throw new ArgumentException("La contraseña es requerida");
 
-            CheckRateLimit(email);
+            CheckLoginRateLimit(email);
 
-            var user = await userRepo.GetByEmailAsync(email);
+            var user = await userRepo.GetByEmailAsync(email.Trim().ToLowerInvariant());
             if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             {
                 RecordFailedAttempt(email);
@@ -87,20 +99,38 @@ namespace services.Services
             if (!password.Any(char.IsUpper))
                 throw new ArgumentException("La contraseña debe contener al menos una mayúscula");
 
+            if (!password.Any(char.IsLower))
+                throw new ArgumentException("La contraseña debe contener al menos una minúscula");
+
             if (!password.Any(char.IsDigit))
                 throw new ArgumentException("La contraseña debe contener al menos un número");
+
+            if (!password.Any(c => !char.IsLetterOrDigit(c)))
+                throw new ArgumentException("La contraseña debe contener al menos un carácter especial (@, #, $, etc.)");
         }
 
-        private void CheckRateLimit(string email)
+        private void CheckRegisterRateLimit(string email)
+        {
+            if (_registerLog.TryGetValue(email, out var lastAttempt))
+            {
+                if (DateTime.UtcNow - lastAttempt < RegisterWindow)
+                {
+                    throw new InvalidOperationException(
+                        "Ya solicitaste un registro recientemente. Espera una hora antes de intentar de nuevo.");
+                }
+            }
+        }
+
+        private void CheckLoginRateLimit(string email)
         {
             if (_failedAttempts.TryGetValue(email, out var attempt))
             {
-                if (attempt.Count >= MaxAttempts)
+                if (attempt.Count >= MaxLoginAttempts)
                 {
                     var elapsed = DateTime.UtcNow - attempt.FirstAttempt;
-                    if (elapsed < LockoutDuration)
+                    if (elapsed < LoginLockoutDuration)
                     {
-                        var remaining = (int)(LockoutDuration - elapsed).TotalMinutes;
+                        var remaining = (int)(LoginLockoutDuration - elapsed).TotalMinutes;
                         throw new UnauthorizedAccessException(
                             $"Demasiados intentos. Intenta de nuevo en {remaining} minuto(s).");
                     }
@@ -116,7 +146,7 @@ namespace services.Services
                 _ => new LoginAttempt { Count = 1, FirstAttempt = now },
                 (_, existing) =>
                 {
-                    if (now - existing.FirstAttempt > LockoutDuration)
+                    if (now - existing.FirstAttempt > LoginLockoutDuration)
                         return new LoginAttempt { Count = 1, FirstAttempt = now };
                     existing.Count++;
                     return existing;

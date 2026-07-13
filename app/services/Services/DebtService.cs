@@ -59,6 +59,8 @@ namespace services.Services
             if (string.IsNullOrWhiteSpace(debt.Name))
                 throw new ArgumentException("Debt name is required");
 
+            debt.Name = SanitizeText(debt.Name);
+
             if (debt.OriginalAmount <= 0)
                 throw new ArgumentException("OriginalAmount must be greater than zero");
 
@@ -131,6 +133,8 @@ namespace services.Services
 
             if (string.IsNullOrWhiteSpace(debt.Name))
                 throw new ArgumentException("Debt name is required");
+
+            debt.Name = SanitizeText(debt.Name);
 
             if (debt.OriginalAmount <= 0)
                 throw new ArgumentException("OriginalAmount must be greater than zero");
@@ -213,6 +217,12 @@ namespace services.Services
                 throw new ArgumentException("UserId is required");
 
             return await debtRepository.GetOverdueDebtsAsync(userId);
+        }
+
+        private static string SanitizeText(string input)
+        {
+            var trimmed = input.Trim();
+            return System.Web.HttpUtility.HtmlEncode(trimmed);
         }
     }
 }
