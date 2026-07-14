@@ -33,6 +33,7 @@ flowchart TD
         Calculator["/calculator"]
         Pagos["/pagos"]
         Login["/login"]
+        Terms["/terms"]
     end
 
     subgraph Layout["Layout"]

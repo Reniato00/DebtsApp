@@ -287,3 +287,73 @@ main {
     height: 1rem;
     border-width: 0.15em;
 }
+
+/* ───── Terms page ───── */
+.terms-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px 16px;
+}
+
+.terms-content h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+}
+
+.terms-date {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-bottom: 32px;
+}
+
+.terms-content section {
+    margin-bottom: 28px;
+}
+
+.terms-content h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #2d3436;
+    margin-bottom: 10px;
+}
+
+.terms-content p {
+    color: #444;
+    line-height: 1.7;
+    margin-bottom: 10px;
+}
+
+.terms-content ul {
+    color: #444;
+    line-height: 1.7;
+    padding-left: 24px;
+}
+
+.terms-content li {
+    margin-bottom: 6px;
+}
+
+.terms-back {
+    display: inline-block;
+    color: #667eea;
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.terms-back:hover {
+    text-decoration: underline;
+}
+
+.terms-footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid #eee;
+}

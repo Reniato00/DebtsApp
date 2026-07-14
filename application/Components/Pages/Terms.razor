@@ -1,0 +1,97 @@
+@page "/terms"
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Términos y Condiciones</PageTitle>
+
+<div class="terms-page">
+    <div class="terms-content">
+        <button class="terms-back" @onclick="GoBack">&larr; Volver</button>
+        <h1>Términos y Condiciones</h1>
+        <p class="terms-date">Última actualización: julio 2026</p>
+
+        <section>
+            <h2>1. Aceptación de los términos</h2>
+            <p>Al registrarse y utilizar DebtsApp, usted acepta los presentes términos y condiciones. Si no está de acuerdo, no debe utilizar la aplicación.</p>
+            <p>Declara bajo su responsabilidad que es mayor de 18 años o, en su defecto, cuenta con la autorización de sus padres o tutores legales para utilizar el servicio.</p>
+        </section>
+
+        <section>
+            <h2>2. Descripción del servicio</h2>
+            <p>DebtsApp es una herramienta de gestión financiera personal que permite a los usuarios registrar, dar seguimiento y analizar sus deudas y pagos. La aplicación se proporciona "tal cual" y con fines exclusivamente informativos y organizativos.</p>
+        </section>
+
+        <section>
+            <h2>3. Limitación de responsabilidad</h2>
+            <p>DebtsApp no es un servicio de asesoría financiera, contable ni legal. Los cálculos, proyecciones y recomendaciones generadas por la aplicación (incluyendo estrategias de pago, intereses y fechas estimadas) son simulaciones aproximadas y no constituyen consejo profesional.</p>
+            <p>El usuario es el único responsable de sus decisiones financieras. Los desarrolladores no serán responsables por:</p>
+            <ul>
+                <li>Decisiones financieras tomadas basándose en la información de la aplicación</li>
+                <li>Errores en el cálculo de intereses o proyecciones</li>
+                <li>Daños directos o indirectos derivados del uso del servicio</li>
+                <li>Pérdida de datos por fallos técnicos</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>4. Privacidad y datos</h2>
+            <p>La aplicación almacena información financiera sensible (montos de deudas, pagos, saldos). Nos comprometemos a:</p>
+            <ul>
+                <li>No compartir sus datos con terceros bajo ninguna circunstancia</li>
+                <li>Proteger su información mediante cifrado de contraseñas (BCrypt)</li>
+                <li>No utilizar sus datos para fines publicitarios o de análisis comerciales</li>
+                <li>Mantener las sesiones seguras mediante timeouts automáticos</li>
+            </ul>
+            <p>Usted es responsable de mantener la confidencialidad de su contraseña.</p>
+        </section>
+
+        <section>
+            <h2>5. Retención y eliminación de datos</h2>
+            <p>Los datos permanecerán en la plataforma mientras el usuario mantenga una cuenta activa. El usuario puede solicitar la eliminación de su cuenta y todos sus datos asociados en cualquier momento contactando al administrador o mediante la funcionalidad de eliminación de cuenta.</p>
+        </section>
+
+        <section>
+            <h2>6. Seguridad</h2>
+            <p>Implementamos las siguientes medidas de seguridad:</p>
+            <ul>
+                <li>Cifrado de contraseñas con BCrypt</li>
+                <li>Políticas de contraseñas seguras (mínimo 8 caracteres, mayúsculas, minúsculas, números y caracteres especiales)</li>
+                <li>Límite de intentos de inicio de sesión (5 intentos, bloqueo de 15 minutos)</li>
+                <li>Límite de registros (1 por hora por correo electrónico)</li>
+                <li>Cabeceras CSP (Content-Security-Policy) en todas las respuestas</li>
+                <li>Redirección forzada a HTTPS</li>
+                <li>Cierre de sesión automático por inactividad (20 minutos)</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>7. Cookies</h2>
+            <p>DebtsApp no utiliza cookies de rastreo ni de terceros. Se utiliza almacenamiento de sesión del servidor para mantener la autenticación del usuario, sin cookies persistentes en el navegador.</p>
+        </section>
+
+        <section>
+            <h2>8. Modificaciones</h2>
+            <p>Nos reservamos el derecho de modificar estos términos en cualquier momento. Los cambios serán notificados a través de la aplicación. El uso continuado del servicio después de las modificaciones constituye la aceptación de los nuevos términos.</p>
+        </section>
+
+        <section>
+            <h2>9. Contacto</h2>
+            <p>Para consultas sobre estos términos o para solicitar la eliminación de sus datos, contacte al administrador del sistema.</p>
+        </section>
+
+        <div class="terms-footer">
+            <button class="btn btn-primary" @onclick="GoBack">Volver</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task GoBack()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/dashboard");
+        else
+            Nav.NavigateTo("/login");
+    }
+}

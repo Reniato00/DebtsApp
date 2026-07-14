@@ -41,6 +41,9 @@
 </nav>
 
 <div class="sidebar-footer">
+    <NavLink class="nav-link" href="terms">
+        Términos y condiciones
+    </NavLink>
     <AuthorizeView>
         <Authorized>
             <a class="nav-link" href="javascript:void(0)" @onclick="LogoutAsync">
@@ -53,6 +56,9 @@
             </NavLink>
         </NotAuthorized>
     </AuthorizeView>
+    <div class="copyright">
+        &copy; 2026 DebtsApp
+    </div>
 </div>
 
 @code {

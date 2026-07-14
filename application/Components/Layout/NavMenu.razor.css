@@ -10,3 +10,14 @@
 .nav-item {
     font-size: 0.9rem;
 }
+
+.sidebar-footer {
+    padding-bottom: 12px;
+}
+
+.copyright {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    padding: 8px 16px 0;
+}

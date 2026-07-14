@@ -35,9 +35,15 @@
 
     @if (ShowRegister)
     {
-        <div class="mb-4">
+        <div class="mb-3">
             <label class="form-label">Confirmar contraseña</label>
             <input type="password" @bind="ConfirmPassword" class="form-control" placeholder="••••••" />
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" @bind="AcceptTerms" class="form-check-input" id="acceptTerms" />
+            <label class="form-check-label small" for="acceptTerms">
+                Declaro ser mayor de 18 años y acepto los <a href="terms" target="_blank">Términos y Condiciones</a>
+            </label>
         </div>
     }
     else
@@ -62,6 +68,12 @@
             @(ShowRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate")
         </a>
     </div>
+
+    <div class="text-center mt-2">
+        <a href="terms" class="text-muted small">
+            Términos y condiciones
+        </a>
+    </div>
 </div>
 
 @code {
@@ -72,6 +84,7 @@
     private string Error = "";
     private bool Loading;
     private bool ShowRegister;
+    private bool AcceptTerms;
 
     private void ToggleMode()
     {
@@ -109,6 +122,12 @@
                 if (Password != ConfirmPassword)
                 {
                     Error = "Las contraseñas no coinciden";
+                    return;
+                }
+
+                if (!AcceptTerms)
+                {
+                    Error = "Debes aceptar los términos y condiciones y declarar ser mayor de 18 años";
                     return;
                 }
             }
