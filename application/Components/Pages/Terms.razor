@@ -6,7 +6,6 @@
 
 <div class="terms-page">
     <div class="terms-content">
-        <button class="terms-back" @onclick="GoBack">&larr; Volver</button>
         <h1>Términos y Condiciones</h1>
         <p class="terms-date">Última actualización: julio 2026</p>
 
@@ -79,19 +78,23 @@
             <p>Para consultas sobre estos términos o para solicitar la eliminación de sus datos, contacte al administrador del sistema.</p>
         </section>
 
-        <div class="terms-footer">
-            <button class="btn btn-primary" @onclick="GoBack">Volver</button>
-        </div>
+        @if (!IsAuthenticated)
+        {
+            <div class="terms-footer">
+                <button class="btn btn-primary" @onclick="GoBackToLogin">Volver</button>
+            </div>
+        }
     </div>
 </div>
 
 @code {
-    private async Task GoBack()
+    private bool IsAuthenticated;
+
+    protected override async Task OnInitializedAsync()
     {
         var auth = await AuthState.GetAuthenticationStateAsync();
-        if (auth.User.Identity?.IsAuthenticated == true)
-            Nav.NavigateTo("/dashboard");
-        else
-            Nav.NavigateTo("/login");
+        IsAuthenticated = auth.User.Identity?.IsAuthenticated == true;
     }
+
+    private void GoBackToLogin() => Nav.NavigateTo("/login");
 }
