@@ -10,6 +10,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = true);
 
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddPersistence();
 builder.Services.AddApplication();

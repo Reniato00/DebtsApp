@@ -165,7 +165,7 @@ flowchart TD
     subgraph AuthFlow["Auth Flow"]
         LOGIN["Login.razor\nEmail+Password\n+ Acepta Términos"]
         PROFILE["Profile.razor\nEliminar cuenta\nModalDialog confirmación"]
-        AS["AuthService\nRegisterAsync / LoginAsync / DeleteAccountAsync\nPassword validation\nRate limiting (5→15min)\nGuarda TermsAcceptance en BD\nElimina Payments, Debts,\nTermsAcceptance, RefreshTokens, User"]
+        AS["AuthService\nRegisterAsync / LoginAsync / DeleteAccountAsync\nPassword validation\nRate limiting (5→15min login, 1→hora email,\n3→hora IP, 24h cooldown post-eliminación)\nGuarda TermsAcceptance en BD\nElimina Payments, Debts,\nTermsAcceptance, RefreshTokens, User"]
         CSP["CustomAuthStateProvider\nSignIn / SignOut\n20min session timeout"]
         PAGES["Pages\nAuthHelper.GetUserIdOrRedirect"]
         DB[("SQL Server\nUsers, Debts, Payments,\nTermsAcceptance, RefreshTokens")]

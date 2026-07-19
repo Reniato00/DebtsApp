@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using persistence.Repositories;
 using domain.Entities;
+using Microsoft.AspNetCore.Http;
 
 namespace services.Services
 {
@@ -20,24 +21,33 @@ namespace services.Services
         private readonly IDebtRepository debtRepo;
         private readonly IPaymentRepository paymentRepo;
         private readonly IRefreshTokenRepository refreshTokenRepo;
+        private readonly IHttpContextAccessor httpContextAccessor;
         private static readonly ConcurrentDictionary<string, LoginAttempt> _failedAttempts = new();
         private static readonly ConcurrentDictionary<string, DateTime> _registerLog = new();
+        private static readonly ConcurrentDictionary<string, int> _ipRegisterCount = new();
+        private static readonly ConcurrentDictionary<string, DateTime> _ipRegisterWindow = new();
+        private static readonly ConcurrentDictionary<string, DateTime> _deletedAccounts = new();
 
         private const int MaxLoginAttempts = 5;
         private const int MaxRegisterAttempts = 3;
         private static readonly TimeSpan LoginLockoutDuration = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RegisterWindow = TimeSpan.FromHours(1);
+        private static readonly TimeSpan IpRegisterWindow = TimeSpan.FromHours(1);
+        private const int MaxRegistrationsPerIp = 3;
+        private static readonly TimeSpan DeletedAccountCooldown = TimeSpan.FromHours(24);
         private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         public AuthService(IUserRepository userRepo, ITermsAcceptanceRepository termsRepo,
             IDebtRepository debtRepo, IPaymentRepository paymentRepo,
-            IRefreshTokenRepository refreshTokenRepo)
+            IRefreshTokenRepository refreshTokenRepo,
+            IHttpContextAccessor httpContextAccessor)
         {
             this.userRepo = userRepo;
             this.termsRepo = termsRepo;
             this.debtRepo = debtRepo;
             this.paymentRepo = paymentRepo;
             this.refreshTokenRepo = refreshTokenRepo;
+            this.httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0")
@@ -51,12 +61,15 @@ namespace services.Services
             if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2)
                 throw new ArgumentException("El nombre debe tener al menos 2 caracteres");
 
-            CheckRegisterRateLimit(email);
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            CheckDeletedAccountCooldown(normalizedEmail);
+            CheckRegisterRateLimit(normalizedEmail);
+            CheckIpRegisterRateLimit();
             ValidatePassword(password);
 
-            _registerLog.AddOrUpdate(email, _ => DateTime.UtcNow, (_, _) => DateTime.UtcNow);
+            _registerLog.AddOrUpdate(normalizedEmail, _ => DateTime.UtcNow, (_, _) => DateTime.UtcNow);
 
-            var existing = await userRepo.GetByEmailAsync(email);
+            var existing = await userRepo.GetByEmailAsync(normalizedEmail);
             if (existing != null)
                 throw new InvalidOperationException("Ya existe un usuario con este correo");
 
@@ -64,7 +77,7 @@ namespace services.Services
             {
                 Id = Guid.NewGuid(),
                 Name = name.Trim(),
-                Email = email.Trim().ToLowerInvariant(),
+                Email = normalizedEmail,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(password)
             };
 
@@ -80,7 +93,7 @@ namespace services.Services
                 AcceptedAt = DateTime.UtcNow
             });
 
-            _registerLog.TryRemove(email, out _);
+            _registerLog.TryRemove(normalizedEmail, out _);
             return (created.Id, created.Name);
         }
 
@@ -126,6 +139,8 @@ namespace services.Services
             await termsRepo.DeleteByUserIdAsync(userId);
             await refreshTokenRepo.DeleteByUserIdAsync(userId);
             await userRepo.DeleteByIdAsync(userId);
+
+            _deletedAccounts[user.Email] = DateTime.UtcNow;
         }
 
         private static void ValidatePassword(string password)
@@ -144,6 +159,51 @@ namespace services.Services
 
             if (!password.Any(c => !char.IsLetterOrDigit(c)))
                 throw new ArgumentException("La contraseña debe contener al menos un carácter especial (@, #, $, etc.)");
+        }
+
+        private void CheckDeletedAccountCooldown(string email)
+        {
+            if (_deletedAccounts.TryGetValue(email, out var deletedAt))
+            {
+                var elapsed = DateTime.UtcNow - deletedAt;
+                if (elapsed < DeletedAccountCooldown)
+                {
+                    var remaining = (int)(DeletedAccountCooldown - elapsed).TotalHours;
+                    throw new InvalidOperationException(
+                        $"Esta cuenta fue eliminada recientemente. Puedes registrarla de nuevo en {remaining} hora(s).");
+                }
+                _deletedAccounts.TryRemove(email, out _);
+            }
+        }
+
+        private void CheckIpRegisterRateLimit()
+        {
+            var ip = httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+            if (string.IsNullOrEmpty(ip)) return;
+
+            if (_ipRegisterWindow.TryGetValue(ip, out var windowStart))
+            {
+                if (DateTime.UtcNow - windowStart > IpRegisterWindow)
+                {
+                    _ipRegisterWindow.TryRemove(ip, out _);
+                    _ipRegisterCount.TryRemove(ip, out _);
+                    return;
+                }
+
+                if (_ipRegisterCount.TryGetValue(ip, out var count) && count >= MaxRegistrationsPerIp)
+                {
+                    var remaining = (int)(IpRegisterWindow - (DateTime.UtcNow - windowStart)).TotalMinutes;
+                    throw new InvalidOperationException(
+                        $"Demasiados registros desde esta dirección IP. Intenta de nuevo en {remaining} minuto(s).");
+                }
+
+                _ipRegisterCount.AddOrUpdate(ip, 1, (_, c) => c + 1);
+            }
+            else
+            {
+                _ipRegisterWindow[ip] = DateTime.UtcNow;
+                _ipRegisterCount[ip] = 1;
+            }
         }
 
         private void CheckRegisterRateLimit(string email)
