@@ -136,7 +136,7 @@
 
             if (ShowRegister)
             {
-                var (userId, userName) = await Auth.RegisterAsync(Email, Name, Password);
+                var (userId, userName) = await Auth.RegisterAsync(Email, Name, Password, "1.0");
                 provider.SignIn(userId, userName);
             }
             else

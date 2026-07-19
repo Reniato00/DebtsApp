@@ -70,6 +70,11 @@
         WHERE Id = @Id AND UserId = @UserId
         """;
 
+        public const string DeleteByUserId = """
+        DELETE FROM Debts
+        WHERE UserId = @UserId
+        """;
+
         public const string TotalAmountDebts = """
         SELECT SUM(CurrentBalance) AS TotalAmount
         FROM Debts

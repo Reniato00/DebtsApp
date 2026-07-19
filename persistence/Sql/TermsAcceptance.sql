@@ -1,0 +1,12 @@
+USE DebtManager_db
+GO
+
+CREATE TABLE TermsAcceptance
+(
+    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    UserId UNIQUEIDENTIFIER NOT NULL,
+    Version VARCHAR(10) NOT NULL DEFAULT '1.0',
+    AcceptedAt DATETIME NOT NULL,
+    CONSTRAINT FK_TermsAcceptance_Users FOREIGN KEY (UserId) REFERENCES Users(Id)
+);
+GO

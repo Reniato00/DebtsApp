@@ -1,0 +1,133 @@
+@page "/profile"
+@using persistence.Repositories
+@using services.Services
+@inject services.Services.IUserService UserService
+@inject ITermsAcceptanceRepository TermsRepo
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Mi Perfil</PageTitle>
+
+<h3 class="mb-4">Mi Perfil</h3>
+
+@if (Loading)
+{
+    <LoadingSpinner />
+}
+else if (!string.IsNullOrEmpty(Error))
+{
+    <AlertMessage Message="@Error" Type="danger" />
+}
+else if (User != null)
+{
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Información personal</h5>
+        <div class="row mb-2">
+            <div class="col-sm-3 text-muted">Nombre</div>
+            <div class="col-sm-9 fw-medium">@User.Name</div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-sm-3 text-muted">Correo</div>
+            <div class="col-sm-9">@User.Email</div>
+        </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Aceptación de términos</h5>
+        @if (TermsAcceptances != null && TermsAcceptances.Any())
+        {
+            @foreach (var t in TermsAcceptances)
+            {
+                <div class="row mb-2">
+                    <div class="col-sm-3 text-muted">Versión</div>
+                    <div class="col-sm-9"><span class="badge bg-primary">@t.Version</span></div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 text-muted">Aceptado el</div>
+                    <div class="col-sm-9">@t.AcceptedAt.ToString("dd/MM/yyyy HH:mm") UTC</div>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="text-muted mb-0">No se encontró registro de aceptación de términos.</p>
+        }
+    </div>
+
+    <div class="card p-4 border-danger">
+        <h5 class="section-title text-danger">Zona de peligro</h5>
+        <p class="text-muted">Una vez que elimines tu cuenta, no hay forma de recuperarla. Todos tus datos (deudas, pagos e información personal) serán eliminados permanentemente.</p>
+        <SubmitButton Label="Eliminar mi cuenta" Class="btn btn-danger" OnClick="() => ShowDeleteModal = true" />
+    </div>
+
+    <ModalDialog Title="¿Eliminar cuenta?" IsVisible="ShowDeleteModal" OnClose="() => ShowDeleteModal = false">
+        <p>¿Estás seguro de que deseas eliminar tu cuenta? Esta acción es irreversible y eliminará todos tus datos.</p>
+        <div class="d-flex gap-2 justify-content-end mt-3">
+            <button class="btn btn-secondary" @onclick="() => ShowDeleteModal = false">Cancelar</button>
+            <SubmitButton Label="Sí, eliminar mi cuenta" Class="btn btn-danger" Loading="@Deleting" OnClick="ConfirmDelete" />
+        </div>
+    </ModalDialog>
+}
+else
+{
+    <EmptyState Message="No se pudo cargar la información del usuario." />
+}
+
+@code {
+    private domain.Entities.User? User;
+    private IEnumerable<domain.Entities.TermsAcceptance>? TermsAcceptances;
+    private bool Loading = true;
+    private bool ShowDeleteModal = false;
+    private bool Deleting = false;
+    private string? Error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var userIdStr = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(userIdStr, out var userId))
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            User = await UserService.GetByIdAsync(userId);
+            TermsAcceptances = await TermsRepo.GetByUserIdAsync(userId);
+            UserId = userId;
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private Guid UserId { get; set; }
+
+    private async Task ConfirmDelete()
+    {
+        Deleting = true;
+        try
+        {
+            await AuthService.DeleteAccountAsync(UserId);
+            ((application.Auth.CustomAuthStateProvider)AuthState).SignOut();
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            ShowDeleteModal = false;
+        }
+        finally
+        {
+            Deleting = false;
+        }
+    }
+}

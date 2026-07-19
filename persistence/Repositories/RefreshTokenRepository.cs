@@ -11,6 +11,7 @@ namespace persistence.Repositories
         Task<RefreshToken?> GetByTokenHashAsync(string tokenHash);
         Task RevokeAsync(Guid id);
         Task RevokeAllForUserAsync(Guid userId);
+        Task DeleteByUserIdAsync(Guid userId);
     }
 
     public class RefreshTokenRepository : IRefreshTokenRepository
@@ -47,6 +48,12 @@ namespace persistence.Repositories
             using var connection = factory.CreateConnection();
             await connection.ExecuteAsync(RefreshTokenQueries.RevokeAllForUser,
                 new { UserId = userId, RevokedAt = DateTime.UtcNow });
+        }
+
+        public async Task DeleteByUserIdAsync(Guid userId)
+        {
+            using var connection = factory.CreateConnection();
+            await connection.ExecuteAsync(RefreshTokenQueries.DeleteByUserId, new { UserId = userId });
         }
     }
 }

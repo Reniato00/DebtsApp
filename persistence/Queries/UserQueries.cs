@@ -38,5 +38,10 @@ namespace persistence.Queries
             PasswordHash = @PasswordHash
         WHERE Id = @Id
         """;
+
+        public const string DeleteById = """
+        DELETE FROM Users
+        WHERE Id = @Id
+        """;
     }
 }

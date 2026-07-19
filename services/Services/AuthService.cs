@@ -7,14 +7,19 @@ namespace services.Services
 {
     public interface IAuthService
     {
-        Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password);
+        Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0");
         Task<(Guid userId, string name)> LoginAsync(string email, string password);
         Task LogoutAsync(Guid userId);
+        Task DeleteAccountAsync(Guid userId);
     }
 
     public class AuthService : IAuthService
     {
         private readonly IUserRepository userRepo;
+        private readonly ITermsAcceptanceRepository termsRepo;
+        private readonly IDebtRepository debtRepo;
+        private readonly IPaymentRepository paymentRepo;
+        private readonly IRefreshTokenRepository refreshTokenRepo;
         private static readonly ConcurrentDictionary<string, LoginAttempt> _failedAttempts = new();
         private static readonly ConcurrentDictionary<string, DateTime> _registerLog = new();
 
@@ -24,12 +29,18 @@ namespace services.Services
         private static readonly TimeSpan RegisterWindow = TimeSpan.FromHours(1);
         private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
-        public AuthService(IUserRepository userRepo)
+        public AuthService(IUserRepository userRepo, ITermsAcceptanceRepository termsRepo,
+            IDebtRepository debtRepo, IPaymentRepository paymentRepo,
+            IRefreshTokenRepository refreshTokenRepo)
         {
             this.userRepo = userRepo;
+            this.termsRepo = termsRepo;
+            this.debtRepo = debtRepo;
+            this.paymentRepo = paymentRepo;
+            this.refreshTokenRepo = refreshTokenRepo;
         }
 
-        public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password)
+        public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0")
         {
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("El correo es requerido");
@@ -61,6 +72,14 @@ namespace services.Services
             if (created == null)
                 throw new Exception("Error al crear el usuario");
 
+            await termsRepo.CreateAsync(new TermsAcceptance
+            {
+                Id = Guid.NewGuid(),
+                UserId = created.Id,
+                Version = termsVersion,
+                AcceptedAt = DateTime.UtcNow
+            });
+
             _registerLog.TryRemove(email, out _);
             return (created.Id, created.Name);
         }
@@ -89,6 +108,24 @@ namespace services.Services
         public Task LogoutAsync(Guid userId)
         {
             return Task.CompletedTask;
+        }
+
+        public async Task DeleteAccountAsync(Guid userId)
+        {
+            var user = await userRepo.GetByIdAsync(userId);
+            if (user == null)
+                throw new InvalidOperationException("Usuario no encontrado");
+
+            var debts = await debtRepo.GetAllAsync(userId);
+            var debtIds = debts.Select(d => d.Id).ToList();
+
+            if (debtIds.Any())
+                await paymentRepo.DeleteByDebtIdsAsync(debtIds);
+
+            await debtRepo.DeleteAllByUserIdAsync(userId);
+            await termsRepo.DeleteByUserIdAsync(userId);
+            await refreshTokenRepo.DeleteByUserIdAsync(userId);
+            await userRepo.DeleteByIdAsync(userId);
         }
 
         private static void ValidatePassword(string password)

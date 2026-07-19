@@ -11,6 +11,7 @@ namespace persistence.Repositories
         Task<User?> GetByEmailAsync(string email);
         Task<User?> CreateUserAsync(User user);
         Task<User?> UpdateUserAsync(User user);
+        Task DeleteByIdAsync(Guid id);
     }
 
     public class UserRepository : IUserRepository
@@ -48,6 +49,12 @@ namespace persistence.Repositories
             var rowsAffected = await connection.ExecuteAsync(UserQueries.UpdateUser, user);
             if (rowsAffected == 0) return null;
             return await GetByIdAsync(user.Id);
+        }
+
+        public async Task DeleteByIdAsync(Guid id)
+        {
+            using var connection = factory.CreateConnection();
+            await connection.ExecuteAsync(UserQueries.DeleteById, new { Id = id });
         }
     }
 }

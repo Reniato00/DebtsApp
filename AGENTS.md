@@ -10,7 +10,7 @@
 flowchart TD
     subgraph Capas["Capas del proyecto"]
         direction TB
-        DOM["domain\nEntities: Debt, Payment, User\nIdempotencyKey"]
+        DOM["domain\nEntities: Debt, Payment, User\nIdempotencyKey, TermsAcceptance"]
         PER["persistence\nDapper + SQL Server\nRepositorios, Queries"]
         SRV["services\nLógica de negocio\nServicios + Models"]
         UI["application\nBlazor Server UI\nComponentes, Auth"]
@@ -34,6 +34,7 @@ flowchart TD
         Pagos["/pagos"]
         Login["/login"]
         Terms["/terms"]
+        Profile["/profile"]
     end
 
     subgraph Layout["Layout"]
@@ -83,6 +84,7 @@ flowchart LR
         DETAIL["DebtDetail"]
         CALC["Calculator"]
         PAGOS["Pagos"]
+        PROFILE["Profile"]
     end
 
     subgraph Services["Services Layer"]
@@ -90,7 +92,7 @@ flowchart LR
         PS["IPaymentService"]
         CS["ICalculatorService"]
         DBS["IDashboardService"]
-        AS["IAuthService"]
+        AS["IAuthService\nRegister / Login / Logout\nDeleteAccount"]
     end
 
     subgraph Data["Data Access"]
@@ -98,6 +100,8 @@ flowchart LR
         PR["PaymentRepository"]
         UR["UserRepository"]
         IR["IdempotencyRepository"]
+        TR["TermsAcceptanceRepository"]
+        RR["RefreshTokenRepository"]
     end
 
     subgraph DB[("SQL Server\nDebtManager_db")]
@@ -115,17 +119,24 @@ flowchart LR
     PAGOS --> DS
     PAGOS --> PS
     Login --> AS
+    PROFILE --> AS
 
     DS --> DR
     PS --> PR
     DBS --> DR
     DBS --> PS
     AS --> UR
+    AS --> TR
+    AS --> DR
+    AS --> PR
+    AS --> RR
 
     DR --> DB
     PR --> DB
     UR --> DB
     IR --> DB
+    TR --> DB
+    RR --> DB
 ```
 
 ```mermaid
@@ -152,13 +163,17 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     subgraph AuthFlow["Auth Flow"]
-        LOGIN["Login.razor\nEmail+Password"]
-        AS["AuthService\nRegisterAsync / LoginAsync\nPassword validation\nRate limiting (5→15min)"]
+        LOGIN["Login.razor\nEmail+Password\n+ Acepta Términos"]
+        PROFILE["Profile.razor\nEliminar cuenta\nModalDialog confirmación"]
+        AS["AuthService\nRegisterAsync / LoginAsync / DeleteAccountAsync\nPassword validation\nRate limiting (5→15min)\nGuarda TermsAcceptance en BD\nElimina Payments, Debts,\nTermsAcceptance, RefreshTokens, User"]
         CSP["CustomAuthStateProvider\nSignIn / SignOut\n20min session timeout"]
         PAGES["Pages\nAuthHelper.GetUserIdOrRedirect"]
+        DB[("SQL Server\nUsers, Debts, Payments,\nTermsAcceptance, RefreshTokens")]
     end
 
     LOGIN --> AS
+    PROFILE --> AS
+    AS --> DB
     AS --> CSP
     CSP --> PAGES
 ```

@@ -22,6 +22,7 @@ namespace persistence.Repositories
         Task<decimal> GetTotalAmountMonthlyPaymentAsync(Guid userId);
         Task<DebtSummaryResult> GetDebtSummaryAsync(Guid userId);
         Task<IEnumerable<Debt>> GetUpcomingPaymentsAsync(Guid userId);
+        Task DeleteAllByUserIdAsync(Guid userId);
     }
 
     public class DebtRepository : IDebtRepository
@@ -132,6 +133,12 @@ namespace persistence.Repositories
         {
             using var connection = factory.CreateConnection();
             return await connection.QueryAsync<Debt>(DebtQueries.UpcomingPayments, new { UserId = userId });
+        }
+
+        public async Task DeleteAllByUserIdAsync(Guid userId)
+        {
+            using var connection = factory.CreateConnection();
+            await connection.ExecuteAsync(DebtQueries.DeleteByUserId, new { UserId = userId });
         }
     }
 }

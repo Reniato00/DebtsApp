@@ -44,5 +44,10 @@ namespace persistence.Queries
             RevokedAt = @RevokedAt
         WHERE UserId = @UserId AND IsRevoked = 0
         """;
+
+        public const string DeleteByUserId = """
+        DELETE FROM RefreshTokens
+        WHERE UserId = @UserId
+        """;
     }
 }

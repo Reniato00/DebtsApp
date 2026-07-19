@@ -20,6 +20,7 @@ namespace persistence.Repositories
         Task<decimal> GetTotalByDebtAsync(Guid debtId);
         Task<IEnumerable<MonthlySpendingItem>> GetMonthlySpendingAsync(Guid userId);
         Task<decimal> GetTotalPaymentsByUserAsync(Guid userId);
+        Task DeleteByDebtIdsAsync(IEnumerable<Guid> debtIds);
     }
 
     public class PaymentRepository : IPaymentRepository
@@ -192,6 +193,12 @@ namespace persistence.Repositories
         {
             using var connection = factory.CreateConnection();
             return await connection.ExecuteScalarAsync<decimal>(PaymentQueries.GetTotalPaymentsByUser, new { UserId = userId });
+        }
+
+        public async Task DeleteByDebtIdsAsync(IEnumerable<Guid> debtIds)
+        {
+            using var connection = factory.CreateConnection();
+            await connection.ExecuteAsync(PaymentQueries.DeleteByDebtIds, new { DebtIds = debtIds });
         }
     }
 }

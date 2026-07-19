@@ -65,6 +65,11 @@ namespace persistence.Queries
         WHERE Id = @Id
         """;
 
+        public const string DeleteByDebtIds = """
+        DELETE FROM Payments
+        WHERE DebtId IN @DebtIds
+        """;
+
         public const string RevertDebtBalance = """
         UPDATE Debts
         SET CurrentBalance = CurrentBalance + @Amount
