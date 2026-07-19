@@ -1,14 +1,16 @@
 using System.Collections.Concurrent;
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using persistence.Repositories;
 using domain.Entities;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace services.Services
 {
     public interface IAuthService
     {
-        Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0");
+        Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0", string? turnstileToken = null);
         Task<(Guid userId, string name)> LoginAsync(string email, string password);
         Task LogoutAsync(Guid userId);
         Task DeleteAccountAsync(Guid userId);
@@ -22,6 +24,7 @@ namespace services.Services
         private readonly IPaymentRepository paymentRepo;
         private readonly IRefreshTokenRepository refreshTokenRepo;
         private readonly IHttpContextAccessor httpContextAccessor;
+        private readonly IConfiguration configuration;
         private static readonly ConcurrentDictionary<string, LoginAttempt> _failedAttempts = new();
         private static readonly ConcurrentDictionary<string, DateTime> _registerLog = new();
         private static readonly ConcurrentDictionary<string, int> _ipRegisterCount = new();
@@ -40,7 +43,8 @@ namespace services.Services
         public AuthService(IUserRepository userRepo, ITermsAcceptanceRepository termsRepo,
             IDebtRepository debtRepo, IPaymentRepository paymentRepo,
             IRefreshTokenRepository refreshTokenRepo,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration)
         {
             this.userRepo = userRepo;
             this.termsRepo = termsRepo;
@@ -48,9 +52,10 @@ namespace services.Services
             this.paymentRepo = paymentRepo;
             this.refreshTokenRepo = refreshTokenRepo;
             this.httpContextAccessor = httpContextAccessor;
+            this.configuration = configuration;
         }
 
-        public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0")
+        public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0", string? turnstileToken = null)
         {
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("El correo es requerido");
@@ -65,6 +70,7 @@ namespace services.Services
             CheckDeletedAccountCooldown(normalizedEmail);
             CheckRegisterRateLimit(normalizedEmail);
             CheckIpRegisterRateLimit();
+            await VerifyTurnstileToken(turnstileToken);
             ValidatePassword(password);
 
             _registerLog.AddOrUpdate(normalizedEmail, _ => DateTime.UtcNow, (_, _) => DateTime.UtcNow);
@@ -141,6 +147,33 @@ namespace services.Services
             await userRepo.DeleteByIdAsync(userId);
 
             _deletedAccounts[user.Email] = DateTime.UtcNow;
+        }
+
+        private async Task VerifyTurnstileToken(string? token)
+        {
+            var secretKey = configuration["Turnstile:SecretKey"];
+            if (string.IsNullOrEmpty(secretKey))
+                return;
+
+            if (string.IsNullOrEmpty(token))
+                throw new InvalidOperationException("Debes completar la verificación de seguridad.");
+
+            using var client = new HttpClient();
+            var response = await client.PostAsync("https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    { "secret", secretKey },
+                    { "response", token }
+                }));
+
+            var result = await response.Content.ReadFromJsonAsync<TurnstileVerifyResponse>();
+            if (result == null || !result.Success)
+                throw new InvalidOperationException("La verificación de seguridad falló. Intenta de nuevo.");
+        }
+
+        private class TurnstileVerifyResponse
+        {
+            public bool Success { get; set; }
         }
 
         private static void ValidatePassword(string password)

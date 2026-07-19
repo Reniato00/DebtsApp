@@ -6,3 +6,23 @@ window.downloadFile = (fileName, base64Content) => {
     link.click();
     document.body.removeChild(link);
 };
+
+window.turnstileGetToken = (widgetId) => {
+    return turnstile.getResponse(widgetId);
+};
+
+window.turnstileReset = (widgetId) => {
+    turnstile.reset(widgetId);
+};
+
+window.turnstileRender = (containerId, siteKey, dotNetRef) => {
+    turnstile.render('#' + containerId, {
+        sitekey: siteKey,
+        callback: (token) => {
+            dotNetRef.invokeMethodAsync('OnTokenCallback', token);
+        },
+        'expired-callback': () => {
+            dotNetRef.invokeMethodAsync('OnTokenExpired');
+        }
+    });
+};

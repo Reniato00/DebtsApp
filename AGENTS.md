@@ -55,6 +55,7 @@ flowchart TD
         RecentPaymentsCard
         PaidVsPendingCard
         InterestCostCard
+        Turnstile
     end
 
     subgraph Helpers["Helpers"]

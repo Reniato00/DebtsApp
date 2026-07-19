@@ -1,0 +1,43 @@
+@implements IAsyncDisposable
+
+@if (!string.IsNullOrEmpty(SiteKey))
+{
+    <div id="@ContainerId"></div>
+}
+
+@code {
+    [Parameter] public string SiteKey { get; set; } = "";
+    [Parameter] public EventCallback<string> TokenChanged { get; set; }
+    [Parameter] public EventCallback Expired { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private string ContainerId { get; set; } = "turnstile-widget-" + Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<Turnstile>? dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrEmpty(SiteKey))
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("turnstileRender", ContainerId, SiteKey, dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTokenCallback(string token)
+    {
+        await TokenChanged.InvokeAsync(token);
+    }
+
+    [JSInvokable]
+    public async Task OnTokenExpired()
+    {
+        await Expired.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+    }
+}

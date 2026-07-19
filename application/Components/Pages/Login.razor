@@ -1,8 +1,10 @@
 @page "/login"
 @layout Layout.BlankLayout
+@using Microsoft.Extensions.Configuration
 @inject services.Services.IAuthService Auth
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
+@inject IConfiguration Config
 
 <PageTitle>Iniciar sesión</PageTitle>
 
@@ -20,6 +22,9 @@
         <div class="mb-3">
             <label class="form-label">Nombre</label>
             <input @bind="Name" class="form-control" placeholder="Tu nombre" />
+        </div>
+        <div class="mb-3 d-flex justify-content-center">
+            <Turnstile SiteKey="@TurnstileSiteKey" TokenChanged="(t) => TurnstileToken = t" Expired="() => TurnstileToken = null" />
         </div>
     }
 
@@ -85,11 +90,14 @@
     private bool Loading;
     private bool ShowRegister;
     private bool AcceptTerms;
+    private string? TurnstileToken;
+    private string TurnstileSiteKey => Config["Turnstile:SiteKey"] ?? "";
 
     private void ToggleMode()
     {
         ShowRegister = !ShowRegister;
         Error = "";
+        TurnstileToken = null;
     }
 
     private async Task SubmitAsync()
@@ -136,7 +144,7 @@
 
             if (ShowRegister)
             {
-                var (userId, userName) = await Auth.RegisterAsync(Email, Name, Password, "1.0");
+                var (userId, userName) = await Auth.RegisterAsync(Email, Name, Password, "1.0", TurnstileToken);
                 provider.SignIn(userId, userName);
             }
             else
