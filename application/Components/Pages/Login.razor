@@ -35,8 +35,19 @@
 
     <div class="mb-3">
         <label class="form-label">Contraseña</label>
-        <input type="password" @bind="Password" class="form-control" placeholder="••••••" />
+        <input type="password" value="@Password" @oninput="OnPasswordInput" class="form-control" placeholder="••••••" />
     </div>
+
+    @if (ShowRegister && !string.IsNullOrEmpty(Password))
+    {
+        <div class="mb-3 small">
+            <div class="@(PwdHasLength ? "text-success" : "text-muted")">@(PwdHasLength ? "✔" : "✘") Mínimo 8 caracteres</div>
+            <div class="@(PwdHasUpper ? "text-success" : "text-muted")">@(PwdHasUpper ? "✔" : "✘") Al menos una mayúscula</div>
+            <div class="@(PwdHasLower ? "text-success" : "text-muted")">@(PwdHasLower ? "✔" : "✘") Al menos una minúscula</div>
+            <div class="@(PwdHasDigit ? "text-success" : "text-muted")">@(PwdHasDigit ? "✔" : "✘") Al menos un número</div>
+            <div class="@(PwdHasSpecial ? "text-success" : "text-muted")">@(PwdHasSpecial ? "✔" : "✘") Al menos un carácter especial (!@@#$%^&*)</div>
+        </div>
+    }
 
     @if (ShowRegister)
     {
@@ -56,7 +67,7 @@
         <div class="mb-4"></div>
     }
 
-    <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@Loading">
+    <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@(Loading || (ShowRegister && !RegisterEnabled))">
         @if (Loading)
         {
             <span class="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -93,10 +104,25 @@
     private string? TurnstileToken;
     private string TurnstileSiteKey => Config["Turnstile:SiteKey"] ?? "";
 
+    private bool PwdHasLength => Password.Length >= 8;
+    private bool PwdHasUpper => Password.Any(char.IsUpper);
+    private bool PwdHasLower => Password.Any(char.IsLower);
+    private bool PwdHasDigit => Password.Any(char.IsDigit);
+    private bool PwdHasSpecial => Password.Any(c => !char.IsLetterOrDigit(c));
+    private bool PwdValid => PwdHasLength && PwdHasUpper && PwdHasLower && PwdHasDigit && PwdHasSpecial;
+    private bool RegisterEnabled => PwdValid && !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(Email) && Password == ConfirmPassword && AcceptTerms;
+
+    private void OnPasswordInput(ChangeEventArgs e)
+    {
+        Password = e.Value?.ToString() ?? "";
+    }
+
     private void ToggleMode()
     {
         ShowRegister = !ShowRegister;
         Error = "";
+        Password = "";
+        ConfirmPassword = "";
         TurnstileToken = null;
     }
 
