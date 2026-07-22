@@ -14,6 +14,7 @@ namespace services.Services
         Task<(Guid userId, string name)> LoginAsync(string email, string password);
         Task LogoutAsync(Guid userId);
         Task DeleteAccountAsync(Guid userId);
+        Task ChangePasswordAsync(Guid userId, string currentPassword, string newPassword);
     }
 
     public class AuthService : IAuthService
@@ -30,6 +31,8 @@ namespace services.Services
         private static readonly ConcurrentDictionary<string, int> _ipRegisterCount = new();
         private static readonly ConcurrentDictionary<string, DateTime> _ipRegisterWindow = new();
         private static readonly ConcurrentDictionary<string, DateTime> _deletedAccounts = new();
+        private static readonly ConcurrentDictionary<string, int> _changePasswordCount = new();
+        private static readonly ConcurrentDictionary<string, DateTime> _changePasswordWindow = new();
 
         private const int MaxLoginAttempts = 5;
         private const int MaxRegisterAttempts = 3;
@@ -38,6 +41,8 @@ namespace services.Services
         private static readonly TimeSpan IpRegisterWindow = TimeSpan.FromHours(1);
         private const int MaxRegistrationsPerIp = 3;
         private static readonly TimeSpan DeletedAccountCooldown = TimeSpan.FromHours(24);
+        private static readonly TimeSpan ChangePasswordWindow = TimeSpan.FromHours(1);
+        private const int MaxChangePasswordAttempts = 3;
         private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
         public AuthService(IUserRepository userRepo, ITermsAcceptanceRepository termsRepo,
@@ -147,6 +152,62 @@ namespace services.Services
             await userRepo.DeleteByIdAsync(userId);
 
             _deletedAccounts[user.Email] = DateTime.UtcNow;
+        }
+
+        public async Task ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)
+        {
+            var user = await userRepo.GetByIdAsync(userId);
+            if (user == null)
+                throw new InvalidOperationException("Usuario no encontrado");
+
+            CheckChangePasswordRateLimit(userId.ToString());
+
+            if (string.IsNullOrWhiteSpace(currentPassword))
+                throw new ArgumentException("La contraseña actual es requerida");
+
+            if (string.IsNullOrWhiteSpace(newPassword))
+                throw new ArgumentException("La nueva contraseña es requerida");
+
+            if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+                throw new UnauthorizedAccessException("La contraseña actual es incorrecta");
+
+            if (currentPassword == newPassword)
+                throw new ArgumentException("La nueva contraseña debe ser diferente a la actual");
+
+            ValidatePassword(newPassword);
+
+            var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            var updatedUser = new User { Id = userId, Name = user.Name, Email = user.Email, PasswordHash = newHash };
+            await userRepo.UpdateUserAsync(updatedUser);
+
+            await refreshTokenRepo.RevokeAllForUserAsync(userId);
+        }
+
+        private void CheckChangePasswordRateLimit(string userId)
+        {
+            if (_changePasswordWindow.TryGetValue(userId, out var windowStart))
+            {
+                if (DateTime.UtcNow - windowStart > ChangePasswordWindow)
+                {
+                    _changePasswordWindow.TryRemove(userId, out _);
+                    _changePasswordCount.TryRemove(userId, out _);
+                    return;
+                }
+
+                if (_changePasswordCount.TryGetValue(userId, out var count) && count >= MaxChangePasswordAttempts)
+                {
+                    var remaining = (int)(ChangePasswordWindow - (DateTime.UtcNow - windowStart)).TotalMinutes;
+                    throw new InvalidOperationException(
+                        $"Demasiados cambios de contraseña. Intenta de nuevo en {remaining} minuto(s).");
+                }
+
+                _changePasswordCount.AddOrUpdate(userId, 1, (_, c) => c + 1);
+            }
+            else
+            {
+                _changePasswordWindow[userId] = DateTime.UtcNow;
+                _changePasswordCount[userId] = 1;
+            }
         }
 
         private async Task VerifyTurnstileToken(string? token)

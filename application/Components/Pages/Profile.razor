@@ -55,6 +55,52 @@ else if (User != null)
         }
     </div>
 
+    <div class="card p-4 mb-4">
+        <h5 class="section-title">Cambiar contraseña</h5>
+        @if (!string.IsNullOrEmpty(PasswordSuccess))
+        {
+            <AlertMessage Message="@PasswordSuccess" Type="success" />
+        }
+        <div class="mb-3">
+            <label class="form-label">Contraseña actual</label>
+            <div class="input-group">
+                <input type="@(ShowCurrentPassword ? "text" : "password")" @bind="CurrentPassword" class="form-control" placeholder="••••••" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="() => ShowCurrentPassword = !ShowCurrentPassword" tabindex="-1">
+                    @(ShowCurrentPassword ? "🙈" : "👁")
+                </button>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Nueva contraseña</label>
+            <div class="input-group">
+                <input type="@(ShowNewPassword ? "text" : "password")" value="@NewPassword" @oninput="OnNewPasswordInput" class="form-control" placeholder="••••••" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="() => ShowNewPassword = !ShowNewPassword" tabindex="-1">
+                    @(ShowNewPassword ? "🙈" : "👁")
+                </button>
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(NewPassword))
+        {
+            <div class="mb-3 small">
+                <div class="@(NewPwdHasLength ? "text-success" : "text-muted")">@(NewPwdHasLength ? "✔" : "✘") Mínimo 8 caracteres</div>
+                <div class="@(NewPwdHasUpper ? "text-success" : "text-muted")">@(NewPwdHasUpper ? "✔" : "✘") Al menos una mayúscula</div>
+                <div class="@(NewPwdHasLower ? "text-success" : "text-muted")">@(NewPwdHasLower ? "✔" : "✘") Al menos una minúscula</div>
+                <div class="@(NewPwdHasDigit ? "text-success" : "text-muted")">@(NewPwdHasDigit ? "✔" : "✘") Al menos un número</div>
+                <div class="@(NewPwdHasSpecial ? "text-success" : "text-muted")">@(NewPwdHasSpecial ? "✔" : "✘") Al menos un carácter especial (!@@#$%^&*)</div>
+            </div>
+        }
+        <div class="mb-3">
+            <label class="form-label">Confirmar nueva contraseña</label>
+            <div class="input-group">
+                <input type="@(ShowConfirmNewPassword ? "text" : "password")" @bind="ConfirmNewPassword" class="form-control" placeholder="••••••" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="() => ShowConfirmNewPassword = !ShowConfirmNewPassword" tabindex="-1">
+                    @(ShowConfirmNewPassword ? "🙈" : "👁")
+                </button>
+            </div>
+        </div>
+        <SubmitButton Label="Cambiar contraseña" Class="btn btn-primary" Loading="@ChangingPassword" Disabled="@(!ChangePasswordEnabled)" OnClick="ChangePasswordAsync" />
+    </div>
+
     <div class="card p-4 border-danger">
         <h5 class="section-title text-danger">Zona de peligro</h5>
         <p class="text-muted">Una vez que elimines tu cuenta, no hay forma de recuperarla. Todos tus datos (deudas, pagos e información personal) serán eliminados permanentemente.</p>
@@ -81,6 +127,53 @@ else
     private bool ShowDeleteModal = false;
     private bool Deleting = false;
     private string? Error;
+
+    private string CurrentPassword = "";
+    private string NewPassword = "";
+    private string ConfirmNewPassword = "";
+    private bool ShowCurrentPassword;
+    private bool ShowNewPassword;
+    private bool ShowConfirmNewPassword;
+    private bool ChangingPassword = false;
+    private string? PasswordSuccess;
+
+    private bool NewPwdHasLength => NewPassword.Length >= 8;
+    private bool NewPwdHasUpper => NewPassword.Any(char.IsUpper);
+    private bool NewPwdHasLower => NewPassword.Any(char.IsLower);
+    private bool NewPwdHasDigit => NewPassword.Any(char.IsDigit);
+    private bool NewPwdHasSpecial => NewPassword.Any(c => !char.IsLetterOrDigit(c));
+    private bool NewPwdValid => NewPwdHasLength && NewPwdHasUpper && NewPwdHasLower && NewPwdHasDigit && NewPwdHasSpecial;
+    private bool ChangePasswordEnabled => NewPwdValid && !string.IsNullOrWhiteSpace(CurrentPassword) && NewPassword == ConfirmNewPassword && !ChangingPassword;
+
+    private void OnNewPasswordInput(ChangeEventArgs e)
+    {
+        NewPassword = e.Value?.ToString() ?? "";
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        PasswordSuccess = null;
+        ChangingPassword = true;
+        try
+        {
+            await AuthService.ChangePasswordAsync(UserId, CurrentPassword, NewPassword);
+            PasswordSuccess = "Contraseña cambiada correctamente. Serás redirigido al login.";
+            CurrentPassword = "";
+            NewPassword = "";
+            ConfirmNewPassword = "";
+            await Task.Delay(2000);
+            ((application.Auth.CustomAuthStateProvider)AuthState).SignOut();
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            ChangingPassword = false;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
