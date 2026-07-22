@@ -35,7 +35,12 @@
 
     <div class="mb-3">
         <label class="form-label">Contraseña</label>
-        <input type="password" value="@Password" @oninput="OnPasswordInput" class="form-control" placeholder="••••••" />
+        <div class="input-group">
+            <input type="@(ShowPassword ? "text" : "password")" value="@Password" @oninput="OnPasswordInput" class="form-control" placeholder="••••••" />
+            <button class="btn btn-outline-secondary" type="button" @onclick="() => ShowPassword = !ShowPassword" tabindex="-1">
+                @(ShowPassword ? "🙈" : "👁")
+            </button>
+        </div>
     </div>
 
     @if (ShowRegister && !string.IsNullOrEmpty(Password))
@@ -53,7 +58,12 @@
     {
         <div class="mb-3">
             <label class="form-label">Confirmar contraseña</label>
-            <input type="password" @bind="ConfirmPassword" class="form-control" placeholder="••••••" />
+            <div class="input-group">
+                <input type="@(ShowConfirmPassword ? "text" : "password")" @bind="ConfirmPassword" class="form-control" placeholder="••••••" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="() => ShowConfirmPassword = !ShowConfirmPassword" tabindex="-1">
+                    @(ShowConfirmPassword ? "🙈" : "👁")
+                </button>
+            </div>
         </div>
         <div class="mb-3 form-check">
             <input type="checkbox" @bind="AcceptTerms" class="form-check-input" id="acceptTerms" />
@@ -103,6 +113,8 @@
     private bool AcceptTerms;
     private string? TurnstileToken;
     private string TurnstileSiteKey => Config["Turnstile:SiteKey"] ?? "";
+    private bool ShowPassword;
+    private bool ShowConfirmPassword;
 
     private bool PwdHasLength => Password.Length >= 8;
     private bool PwdHasUpper => Password.Any(char.IsUpper);
@@ -123,6 +135,8 @@
         Error = "";
         Password = "";
         ConfirmPassword = "";
+        ShowPassword = false;
+        ShowConfirmPassword = false;
         TurnstileToken = null;
     }
 
