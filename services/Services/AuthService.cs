@@ -5,6 +5,8 @@ using persistence.Repositories;
 using domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using services.Logging;
 
 namespace services.Services
 {
@@ -26,6 +28,7 @@ namespace services.Services
         private readonly IRefreshTokenRepository refreshTokenRepo;
         private readonly IHttpContextAccessor httpContextAccessor;
         private readonly IConfiguration configuration;
+        private readonly ILogger<AuthService> logger;
         private static readonly ConcurrentDictionary<string, LoginAttempt> _failedAttempts = new();
         private static readonly ConcurrentDictionary<string, DateTime> _registerLog = new();
         private static readonly ConcurrentDictionary<string, int> _ipRegisterCount = new();
@@ -49,7 +52,8 @@ namespace services.Services
             IDebtRepository debtRepo, IPaymentRepository paymentRepo,
             IRefreshTokenRepository refreshTokenRepo,
             IHttpContextAccessor httpContextAccessor,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILogger<AuthService> logger)
         {
             this.userRepo = userRepo;
             this.termsRepo = termsRepo;
@@ -58,10 +62,14 @@ namespace services.Services
             this.refreshTokenRepo = refreshTokenRepo;
             this.httpContextAccessor = httpContextAccessor;
             this.configuration = configuration;
+            this.logger = logger;
         }
 
         public async Task<(Guid userId, string name)> RegisterAsync(string email, string name, string password, string termsVersion = "1.0", string? turnstileToken = null)
         {
+            var ip = GetClientIp();
+            AppLogger.Auth(logger, "Register attempt", email: email, ip: ip, success: false);
+
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("El correo es requerido");
 
@@ -105,11 +113,13 @@ namespace services.Services
             });
 
             _registerLog.TryRemove(normalizedEmail, out _);
+            AppLogger.Auth(logger, "Register", userId: created.Id, email: normalizedEmail, ip: ip, success: true);
             return (created.Id, created.Name);
         }
 
         public async Task<(Guid userId, string name)> LoginAsync(string email, string password)
         {
+            var ip = GetClientIp();
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("El correo es requerido");
 
@@ -122,15 +132,18 @@ namespace services.Services
             if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             {
                 RecordFailedAttempt(email);
+                AppLogger.Auth(logger, "Login", email: email, ip: ip, success: false, details: "Invalid credentials");
                 throw new UnauthorizedAccessException("Correo o contraseña incorrectos");
             }
 
             _failedAttempts.TryRemove(email, out _);
+            AppLogger.Auth(logger, "Login", userId: user.Id, email: email, ip: ip, success: true);
             return (user.Id, user.Name);
         }
 
         public Task LogoutAsync(Guid userId)
         {
+            AppLogger.Auth(logger, "Logout", userId: userId);
             return Task.CompletedTask;
         }
 
@@ -139,6 +152,8 @@ namespace services.Services
             var user = await userRepo.GetByIdAsync(userId);
             if (user == null)
                 throw new InvalidOperationException("Usuario no encontrado");
+
+            AppLogger.AccountDeletion(logger, userId, user.Email, GetClientIp());
 
             var debts = await debtRepo.GetAllAsync(userId);
             var debtIds = debts.Select(d => d.Id).ToList();
@@ -156,11 +171,20 @@ namespace services.Services
 
         public async Task ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)
         {
+            var ip = GetClientIp();
             var user = await userRepo.GetByIdAsync(userId);
             if (user == null)
                 throw new InvalidOperationException("Usuario no encontrado");
 
-            CheckChangePasswordRateLimit(userId.ToString());
+            try
+            {
+                CheckChangePasswordRateLimit(userId.ToString());
+            }
+            catch (InvalidOperationException ex)
+            {
+                AppLogger.PasswordChange(logger, userId, ip, success: false, reason: ex.Message);
+                throw;
+            }
 
             if (string.IsNullOrWhiteSpace(currentPassword))
                 throw new ArgumentException("La contraseña actual es requerida");
@@ -169,7 +193,10 @@ namespace services.Services
                 throw new ArgumentException("La nueva contraseña es requerida");
 
             if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            {
+                AppLogger.PasswordChange(logger, userId, ip, success: false, reason: "Invalid current password");
                 throw new UnauthorizedAccessException("La contraseña actual es incorrecta");
+            }
 
             if (currentPassword == newPassword)
                 throw new ArgumentException("La nueva contraseña debe ser diferente a la actual");
@@ -181,6 +208,12 @@ namespace services.Services
             await userRepo.UpdateUserAsync(updatedUser);
 
             await refreshTokenRepo.RevokeAllForUserAsync(userId);
+            AppLogger.PasswordChange(logger, userId, ip, success: true);
+        }
+
+        private string? GetClientIp()
+        {
+            return httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
         }
 
         private void CheckChangePasswordRateLimit(string userId)
